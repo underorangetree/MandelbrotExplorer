@@ -5,8 +5,8 @@
 
 using timePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-constexpr int WIDTH = 400;
-constexpr int HEIGHT = 225;
+constexpr int WIDTH = 1920;
+constexpr int HEIGHT = 1080;
 constexpr int MAX_ITER = 1000;
 constexpr int FPS = 60;
 constexpr int DURATION_SECONDS = 10;
@@ -74,7 +74,7 @@ int main() {
     }
     std::ofstream file("timings.csv", std::ios::out);
     if (!file.is_open()) return -2;
-    file << "Generate Stage, Color Stage, Floodlight Stage\n";
+    file << "Generate Stage, Color Stage, Bloom Stage\n";
     auto size = mandelbrot.elapsedTimes[0].size();
     for (size_t i = 0; i < size; ++i) {
         for (size_t j = 0; j < 3; ++j) {
