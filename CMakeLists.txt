@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(MandelbrotExplorer VERSION 0.1.0
+project(MandelbrotExplorer VERSION 0.2.0
         DESCRIPTION "A Mandelbrot set explorer using OpenCV"
         LANGUAGES CXX)
 
@@ -25,7 +25,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall
     -Wextra
     -Werror
-    -mavx
     -march=native
     $<$<CONFIG:RELEASE>:-O2>
     $<$<CONFIG:RelWithDebInfo>:-O2 -g>
