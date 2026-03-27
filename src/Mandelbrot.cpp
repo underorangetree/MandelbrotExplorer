@@ -1,203 +1,245 @@
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <xmmintrin.h>
 #if defined(__AVX__)
     #include <immintrin.h>
 #elif defined(__ARM_NEON)
     #include <arm_neon.h>
 #endif
-#include <chrono> // debug
+#include "ExitStatus.h"
 #include "Mandelbrot.h"
-Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations) noexcept :
+Mandelbrot::Mandelbrot(size_t _width, size_t _height, uint32_t _maxIterations):
+    image_width(_width),
+    image_height(_height),
     #if defined (__AVX__)
-        width((_width + 7) & ~7),
+        width((image_width + 7) & ~7),
     #elif defined(__ARM_NEON)
-        width((_width + 3) & ~3),
+        width((image_width + 3) & ~3),
     #else
-        width(_width),
+        width(image_width),
     #endif
-    height(_height),
+    height(image_height),
     max_iterations(_maxIterations),
-    r_data(static_cast<double*>(operator new(width * sizeof(double), std::nothrow))),
-    i_data(static_cast<double*>(operator new(height * sizeof(double), std::nothrow))),
+    r_data(static_cast<double*>(operator new(width * sizeof(double), std::align_val_t(32), std::nothrow))),
+    i_data(static_cast<double*>(operator new(height * sizeof(double), std::align_val_t(32), std::nothrow))),
     iteration_data(static_cast<float*>(operator new(width * height * sizeof(float), std::align_val_t(32), std::nothrow))),
-    image(_height, _width, CV_8UC3),
-    num_threads(std::max(1U, std::thread::hardware_concurrency())) {
-        if (r_data == nullptr || i_data == nullptr || iteration_data == nullptr || !image.isContinuous())
-            std::abort(); // 抛什么异常，直接爆了
-        elapsed_times.resize(3); // debug
+    thread_pool(static_cast<size_t>(std::max(1U, std::thread::hardware_concurrency()))),
+    image(image_height, image_width, CV_8UC3) {
+        if (r_data == nullptr || i_data == nullptr || iteration_data == nullptr || !image.isContinuous()) {
+            std::cerr << "Memory allocation failed.\n";
+            std::exit(MemoryAllocationError);
+        }
 }
 Mandelbrot::~Mandelbrot() {
-    operator delete(r_data, std::nothrow);
-    operator delete(i_data, std::nothrow);
+    operator delete(r_data, std::align_val_t(32), std::nothrow);
+    operator delete(i_data, std::align_val_t(32), std::nothrow);
     operator delete(iteration_data, std::align_val_t(32), std::nothrow);
 }
 void Mandelbrot::setView(double new_zoom, double new_offset_x, double new_offset_y) {
     zoom = new_zoom;
-    delta = 4.0 / std::max(width, height) / zoom;
+    delta = 4.0 / std::max(image_width, image_height) / zoom;
     offsetX = new_offset_x;
     offsetY = new_offset_y;
-    // This is not a performance hotspot, SIMD is not used.
-    for (int x = 0; x < width; ++x) {
-        r_data[x] = std::fma(static_cast<double>(x - (width >> 1)), delta, offsetX);
+    for (size_t x = 0; x < width; ++x) {
+        r_data[x] = std::fma(x - (image_width / 2.0), delta, offsetX);
     }
-    for (int y = 0; y < height; ++y) {
-        i_data[y] = std::fma(static_cast<double>(y - (height >> 1)), delta, offsetY);
+    for (size_t y = 0; y < height; ++y) {
+        i_data[y] = std::fma(y - (image_height / 2.0), delta, offsetY);
     }
 }
-void Mandelbrot::rows_generate(int startY, int endY) {
-    for (int y = startY; y < endY; ++y) {
+void Mandelbrot::row_generate(size_t y) {
+    float* iteration_row = iteration_data + y * width;
+    #if defined (__AVX__)
+        const __m256d y_vec = _mm256_set1_pd(i_data[y]);
+        const __m256d zeros = _mm256_setzero_pd();
+        const __m256d ones = _mm256_set1_pd(1.0);
+        const __m256d twos = _mm256_set1_pd(2.0);
+        const __m256d fours = _mm256_set1_pd(4.0);
+        for (size_t x = 0; x < width; x += 4) {
+            const __m256d x_vec = _mm256_load_pd(r_data + x);
+            __m256d r = zeros;
+            __m256d i = zeros;
+            __m256d ri = zeros;
+            __m256d r2 = zeros;
+            __m256d i2 = zeros;
+            __m256d iteration_vec = zeros;
+            __m256d mod_squared_vec = zeros;
+            for (uint32_t iter = 0; iter < max_iterations; ++iter) {
+                __m256d continue_mask = _mm256_cmp_pd(mod_squared_vec, fours, _CMP_LT_OQ);
+                if (_mm256_movemask_pd(continue_mask) == 0)
+                    break;
+                iteration_vec = _mm256_add_pd(iteration_vec, _mm256_and_pd(continue_mask, ones));
+                #if defined(__FMA__)
+                    i = _mm256_fmadd_pd(twos, ri, y_vec);
+                #else
+                    i = _mm256_add_pd(_mm256_add_pd(ri, ri), y_vec);
+                #endif
+                r = _mm256_add_pd(r2, _mm256_sub_pd(x_vec, i2));
+                i2 = _mm256_mul_pd(i, i);
+                r2 = _mm256_mul_pd(r, r);
+                ri = _mm256_mul_pd(r, i);
+                mod_squared_vec = _mm256_add_pd(r2, i2);
+            }
+            __m128 iteration_result = _mm256_cvtpd_ps(iteration_vec);
+            _mm_store_ps(iteration_row + x, iteration_result);
+        }
+    #elif defined(__ARM_NEON)
+        const float64x2_t y_vec = vdupq_n_f64(i_data[y]);
+        const float64x2_t zeros = vdupq_n_f64(0.0);
+        const float64x2_t ones = vdupq_n_f64(1.0);
+        const float64x2_t twos = vdupq_n_f64(2.0);
+        const float64x2_t fours = vdupq_n_f64(4.0);
+        for (size_t x = 0; x < width; x+=2) {
+            const float64x2_t x_vec = vld1q_f64(r_data + x);
+            float64x2_t r = zeros;
+            float64x2_t i = zeros;
+            float64x2_t ri = zeros;
+            float64x2_t r2 = zeros;
+            float64x2_t i2 = zeros;
+            float64x2_t iteration_vec = zeros;
+            float64x2_t mod_squared_vec = zeros;
+            for (uint32_t iter = 0; iter < max_iterations; ++iter) {
+                uint64x2_t mask = vcltq_f64(mod_squared_vec, fours);
+                if (vaddvq_u64(mask) == 0)
+                    break;
+                iteration_vec = vaddq_f64(iteration_vec, vbslq_f64(mask, ones, zeros));
+                i = vaddq_f64(vmulq_f64(twos, ri), y_vec);
+                r = vaddq_f64(r2, vsubq_f64(x_vec, i2));
+                i2 = vmulq_f64(i, i);
+                r2 = vmulq_f64(r, r);
+                ri = vmulq_f64(r, i);
+                mod_squared_vec = vaddq_f64(r2, i2);
+            }
+            uint32x2_t iteration_float = vcvt_u32_f64(iteration_vec);
+            vst1_u32(iteration_row + x, iteration_float);
+        }
+    #else
+        for (size_t x = 0; x < width; ++x) {
+            double r = 0.0, i = 0.0;
+            double ri = 0.0;
+            double r2 = 0.0, i2 = 0.0;
+            uint32_t iter = 0;
+            while (r2 + i2 <= 4.0 && iter < max_iterations) {
+                i = std::fma(2.0, ri, i_data[y]);
+                r = r2 - i2 + r_data[x];
+                i2 = i * i;
+                r2 = r * r;
+                ri = r * i;
+                ++iter;
+            }
+            iteration_row[x] = iter;
+        }
+    #endif
+}
+void Mandelbrot::row_color_render(size_t y) {
+    const float a = 4.0f;
+    const float min_kelvin = 100.0f;
+    const float max_kelvin = 6000.0f;
+    // 这里不推荐AVX
+    // #if defined (__AVX__)
+    //     const __m256 zeros = _mm256_setzero_ps();
+    //     const __m256 ones = _mm256_set1_ps(1.0f);
+    //     const __m256 f255_vec = _mm256_set1_ps(255.0f);
+    //     const __m256 a_vec = _mm256_set1_ps(a);
+    //     const __m256 min_kelvin_vec = _mm256_set1_ps(min_kelvin);
+    //     const __m256 max_kelvin_vec = _mm256_set1_ps(max_kelvin);
+    //     const __m256 a_div_max_kelvin_vec = _mm256_set1_ps(a / max_kelvin);
+    //     const __m256 b_k = _mm256_set1_ps(0.06375f);
+    //     const __m256 b_b = _mm256_set1_ps(-127.5f);
+    //     const __m256 g_k = _mm256_set1_ps(0.04636f);
+    //     const __m256 g_b = _mm256_set1_ps(-23.18f);
+    //     const __m256 max_iteration_vec = _mm256_set1_ps(static_cast<float>(max_iterations));
+    //     uint8_t* row_ptr = image.data + y * image.step;
+    //     float* iteration_row = iteration_data + y * width;
+    //     alignas(32) uint32_t b_buf[8], g_buf[8], r_buf[8];
+    //     size_t x = 0;
+    //     for (; x < image_width - 8; x += 8) {
+    //         __m256 iteration_vec = _mm256_load_ps(iteration_row + x);
+    //         __m256 render_mask = _mm256_cmp_ps(iteration_vec, max_iteration_vec, _CMP_LT_OQ);
+    //         __m256 raw_kelvin_vec = _mm256_fmadd_ps(a_vec, iteration_vec, min_kelvin_vec);
+    //         __m256 kelvin_vec = _mm256_min_ps(raw_kelvin_vec, max_kelvin_vec);
+    //         __m256 lightness = _mm256_min_ps(_mm256_mul_ps(a_div_max_kelvin_vec, kelvin_vec), ones);
+    //         __m256 raw_b_vec = _mm256_fmadd_ps(b_k, kelvin_vec, b_b);
+    //         __m256 raw_g_vec = _mm256_fmadd_ps(g_k, kelvin_vec, g_b);
+    //         __m256 scaled_b_vec = _mm256_mul_ps(raw_b_vec, lightness);
+    //         __m256 scaled_g_vec = _mm256_mul_ps(raw_g_vec, lightness);
+    //         __m256 scaled_r_vec = _mm256_mul_ps(f255_vec, lightness);
+    //         __m256 clamped_b_vec = _mm256_max_ps(_mm256_min_ps(scaled_b_vec, f255_vec), zeros);
+    //         __m256 clamped_g_vec = _mm256_max_ps(_mm256_min_ps(scaled_g_vec, f255_vec), zeros);
+    //         __m256 clamped_r_vec = _mm256_max_ps(_mm256_min_ps(scaled_r_vec, f255_vec), zeros);
+    //         __m256 float_b_vec = _mm256_and_ps(clamped_b_vec, render_mask);
+    //         __m256 float_g_vec = _mm256_and_ps(clamped_g_vec, render_mask);
+    //         __m256 float_r_vec = _mm256_and_ps(clamped_r_vec, render_mask);
+    //         __m256i int_b_vec = _mm256_cvtps_epi32(float_b_vec);
+    //         __m256i int_g_vec = _mm256_cvtps_epi32(float_g_vec);
+    //         __m256i int_r_vec = _mm256_cvtps_epi32(float_r_vec);
+    //         _mm256_store_si256(reinterpret_cast<__m256i*>(b_buf), int_b_vec);
+    //         _mm256_store_si256(reinterpret_cast<__m256i*>(g_buf), int_g_vec);
+    //         _mm256_store_si256(reinterpret_cast<__m256i*>(r_buf), int_r_vec);
+    //         for (size_t i = 0; i < 8; ++i) {
+    //             row_ptr[3 * (x + i) + 0] = static_cast<uint8_t>(b_buf[i]);
+    //             row_ptr[3 * (x + i) + 1] = static_cast<uint8_t>(g_buf[i]);
+    //             row_ptr[3 * (x + i) + 2] = static_cast<uint8_t>(r_buf[i]);
+    //         }
+    //     }
+    //     for (; x < image_width; ++x) {
+    //         float iter = iteration_row[x];
+    //         if (iter >= max_iterations) {
+    //             row_ptr[x * 3 + 0] = 0;
+    //             row_ptr[x * 3 + 1] = 0;
+    //             row_ptr[x * 3 + 2] = 0;
+    //         } else {
+    //             float kelvin = std::min(std::fma(a, iter, min_kelvin), max_kelvin);
+    //             float lightness = std::min(a * kelvin / max_kelvin, 1.0f);
+    //             // float g = 99.47 * std::log(kelvin) - 619.2;
+    //             // float b = kelvin <= 1900 ? 0 : 138.5 * std::log(kelvin - 1000) - 942.9;
+    //             float b = std::fma(0.06375f, kelvin, -127.5f);
+    //             float g = std::fma(0.04636f, kelvin, -23.18f);
+    //             auto clamp = [](float value) {
+    //                 return static_cast<uint8_t>(std::clamp(value, 0.0f, 255.0f));
+    //             };
+    //             row_ptr[x * 3 + 0] = clamp(b * lightness);
+    //             row_ptr[x * 3 + 1] = clamp(g * lightness);
+    //             row_ptr[x * 3 + 2] = clamp(255 * lightness);
+    //         }
+    //     }
+    // #else
+        uint8_t* row_ptr = image.data + y * image.step;
         float* iteration_row = iteration_data + y * width;
-        #if defined (__AVX__)
-            const __m256d y_vec = _mm256_set1_pd(i_data[y]);
-            const __m256d zeros = _mm256_setzero_pd();
-            for (int x = 0; x < width; x+=4) {
-                const __m256d x_vec = _mm256_load_pd(r_data + x);
-                __m256d r = zeros;
-                __m256d i = zeros;
-                __m256d r2 = zeros;
-                __m256d i2 = zeros;
-                __m256d iteration = zeros;
-                __m256d mod_squared = zeros;
-                __m256d escape_radius_squared = zeros;
-                for (int iter = 0; iter < max_iterations; ++iter) {
-                    __m256d mask = _mm256_cmp_pd(mod_squared, _mm256_set1_pd(4.0), _CMP_LT_OQ);
-                    if (_mm256_movemask_pd(mask) == 0)
-                        break;
-                    iteration = _mm256_add_pd(iteration, _mm256_and_pd(_mm256_set1_pd(1.0), mask));
-                    __m256d temp_r = _mm256_add_pd(_mm256_sub_pd(r2, i2), x_vec);
-                    #if defined(__FMA__)
-                    i = _mm256_fmadd_pd(_mm256_mul_pd(_mm256_set1_pd(2.0), r), i, y_vec);
-                    #else
-                    i = _mm256_add_pd(_mm256_mul_pd(_mm256_mul_pd(_mm256_set1_pd(2.0), r), i), y_vec);
-                    #endif
-                    r = temp_r;
-                    r2 = _mm256_mul_pd(r, r);
-                    i2 = _mm256_mul_pd(i, i);
-                    mod_squared = _mm256_add_pd(r2, i2);
-                    escape_radius_squared = _mm256_and_pd(mod_squared, mask);
-                }
-                // 考虑辅助函数f(x) = f(x^2)-1，f(4) = 0，f(16) = 1，可以得到f(x) = log(log(x)/log(4))/log(2)，不妨用g(x) = (8-x)/12近似
-                __m256d extra_iteration = _mm256_mul_pd(_mm256_sub_pd(_mm256_set1_pd(8.0), escape_radius_squared), _mm256_set1_pd(1.0/12.0));
-                iteration = _mm256_add_pd(iteration, extra_iteration);
-                __m128 iteration_float = _mm256_cvtpd_ps(iteration);
-                _mm_store_ps(iteration_row + x, iteration_float);
-            }
-        #elif defined(__ARM_NEON)
-            const float64x2_t y_vec = vdupq_n_f64(i_data[y]);
-            const float64x2_t zeros = vdupq_n_f64(0.0);
-            const float64x2_t ones = vdupq_n_f64(1.0);
-            for (int x = 0; x < width; x+=2) {
-                const float64x2_t x_vec = vld1q_f64(r_data + x);
-                float64x2_t r = zeros;
-                float64x2_t i = zeros;
-                float64x2_t r2 = zeros;
-                float64x2_t i2 = zeros;
-                float64x2_t iteration = zeros;
-                float64x2_t mod_squared = zeros;
-                float64x2_t escape_radius_squared = zeros;
-                for (int iter = 0; iter < max_iterations; ++iter) {
-                    uint64x2_t mask = vcltq_f64(mod_squared, vdupq_n_f64(4.0));
-                    if (vaddvq_u64(mask) == 0)
-                        break;
-                    iteration = vaddq_f64(iteration, vbslq_f64(mask, ones, zeros));
-                    float64x2_t temp_r = vaddq_f64(vsubq_f64(r2, i2), x_vec);
-                    i = vaddq_f64(vmulq_f64(vmulq_f64(vdupq_n_f64(2.0), r), i), y_vec);
-                    r = temp_r;
-                    r2 = vmulq_f64(r, r);
-                    i2 = vmulq_f64(i, i);
-                    mod_squared = vaddq_f64(r2, i2);
-                    escape_radius_squared = vbslq_f64(mask, mod_squared, zeros);
-                }
-                float64x2_t extra_iteration = vmulq_f64(vsubq_f64(vdupq_n_f64(8.0), escape_radius_squared), vdupq_n_f64(1.0/12.0));
-                iteration = vaddq_f64(iteration, extra_iteration);
-                float32x2_t iteration_float = vcvt_f32_f64(iteration);
-                vst1_f32(iteration_row + x, iteration_float);
-            }
-        #else
-            for (int x = 0; x < width; ++x) {
-                double r = 0.0, i = 0.0;
-                double r2 = 0.0, i2 = 0.0;
-                int iter = 0;
-                while (r2 + i2 <= 4.0 && iter < max_iterations) {
-                    i = std::fma(2.0 * r, i, i_data[y]);
-                    r = std::fma(r, r, -i2 + r_data[x]);
-                    r2 = r * r;
-                    i2 = i * i;
-                    ++iter;
-                }
-                float extra_iteration = static_cast<float>((8.0 - (r2 + i2)) / 12.0);
-                iteration_row[x] = iter + extra_iteration;
-            }
-        #endif
-    }
-}
-void Mandelbrot::rows_color_render(int startY, int endY) {
-    const float minKelvin = 100.0;
-    const float maxKelvin = 6000.0;
-    for (int y = startY; y < endY; ++y) {
-        uint8_t* rowPtr = image.data + y * image.step;
-        float* iterationRow = iteration_data + y * width;
-        for (int x = 0; x < image.cols; ++x) {
-            float iter = iterationRow[x];
+        for (size_t x = 0; x < image_width; ++x) {
+            float iter = iteration_row[x];
             if (iter >= max_iterations) {
-                rowPtr[x * 3 + 0] = 0;
-                rowPtr[x * 3 + 1] = 0;
-                rowPtr[x * 3 + 2] = 0;
+                row_ptr[x * 3 + 0] = 0;
+                row_ptr[x * 3 + 1] = 0;
+                row_ptr[x * 3 + 2] = 0;
             } else {
-                float kelvin = std::min(minKelvin + 6 * iter, maxKelvin);
-                float lightness = std::min(8 * kelvin / maxKelvin, 1.0f);
-                float g = 99.47 * std::log(kelvin) - 619.2;
-                float b = kelvin <= 1900 ? 0 : 138.5 * std::log(kelvin - 1000) - 942.9;
+                float kelvin = std::min(min_kelvin + a * iter, max_kelvin);
+                float lightness = std::min(a * kelvin / max_kelvin, 1.0f);
+                float b = std::fma(0.06375f, kelvin, -127.5f);
+                float g = std::fma(0.04636f, kelvin, -23.18f);
                 auto clamp = [](float value) {
                     return static_cast<uint8_t>(std::clamp(value, 0.0f, 255.0f));
                 };
-                rowPtr[x * 3 + 0] = clamp(b * lightness);
-                rowPtr[x * 3 + 1] = clamp(g * lightness);
-                rowPtr[x * 3 + 2] = clamp(255 * lightness);
+                row_ptr[x * 3 + 0] = clamp(b * lightness);
+                row_ptr[x * 3 + 1] = clamp(g * lightness);
+                row_ptr[x * 3 + 2] = clamp(255 * lightness);
             }
         }
-    }
+    // #endif
 }
 void Mandelbrot::generate() {
-    auto start_time = std::chrono::high_resolution_clock::now(); // debug
-    threads.clear();
-    for (unsigned int threadId = 0; threadId < num_threads; ++threadId) {
-        const int startY = threadId * height / num_threads;
-        const int endY = (threadId + 1) * height / num_threads;
-        threads.emplace_back(&Mandelbrot::rows_generate, this, startY, endY);
+    for (size_t y = 0; y < height; ++y) {
+        thread_pool.enqueue([this, y]() { row_generate(y); });
     }
-    for (auto& thread : threads) {
-        thread.join();
-    }
-    elapsed_times[0].push_back(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count()); // debug
 }
 cv::Mat& Mandelbrot::render() {
-    auto start_time = std::chrono::high_resolution_clock::now(); // debug
-    threads.clear();
-    for (unsigned int threadId = 0; threadId < num_threads; ++threadId) {
-        const int startY = threadId * height / num_threads;
-        const int endY = (threadId + 1) * height / num_threads;
-        threads.emplace_back(&Mandelbrot::rows_color_render, this, startY, endY);
+    for (size_t y = 0; y < height; ++y) {
+        thread_pool.enqueue([this, y]() { row_color_render(y); });
     }
-    for (auto& thread : threads) {
-        thread.join();
-    }
-    elapsed_times[1].push_back(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count()); // debug
-    start_time = std::chrono::high_resolution_clock::now(); // debug
-    // 泛光
-    const float threshold = 200.0f;
-    const int blurSize = 15;
-    cv::Mat gray;
-    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-    cv::Mat brightMask;
-    cv::threshold(gray, brightMask, threshold, 255, cv::THRESH_BINARY);
-    cv::Mat brightPart;
-    image.copyTo(brightPart, brightMask);
-    cv::Mat blurred;
-    cv::GaussianBlur(brightPart, blurred, cv::Size(blurSize, blurSize), 0);
-    cv::addWeighted(image, 1.0f, blurred, 0.2f, 0, image);
-    elapsed_times[2].push_back(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count()); // debug
+    thread_pool.wait_all_idle();
     return image;
 }

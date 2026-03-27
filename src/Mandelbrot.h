@@ -1,12 +1,15 @@
 #pragma once
-#include <thread>
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 #include <opencv2/opencv.hpp>
+#include "ThreadPool.h"
 class Mandelbrot {
 private:
-    const int width;
-    const int height;
-    const int max_iterations;
+    const size_t image_width;
+    const size_t image_height;
+    const size_t width;
+    const size_t height;
+    const uint32_t max_iterations;
     double zoom = 0.8;
     double delta;
     double offsetX = 0.0;
@@ -14,20 +17,18 @@ private:
     double* const r_data;
     double* const i_data;
     float* const iteration_data;
+    ThreadPool thread_pool;
     cv::Mat image;
-    const unsigned int num_threads;
-    std::vector<std::thread> threads;
-    bool pass_bloom_stage = false;
 public:
-    std::vector<std::vector<long>> elapsed_times; // debug
-    Mandelbrot(int _width, int _height, int _maxIterations) noexcept;
+    Mandelbrot(size_t _width = 1920, size_t _height = 1080, uint32_t _maxIterations = 1000);
     ~Mandelbrot();
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
     float* getIteration_data() const noexcept { return iteration_data; }
 private:
-    void rows_generate(int startY, int endY);
-    void rows_color_render(int startY, int endY);
+    void row_generate(size_t y);
+    void row_color_render(size_t y);
 public:
     void generate();
     cv::Mat& render();
+    
 };

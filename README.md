@@ -1,6 +1,6 @@
 # MandelbrotExplorer
 
-高性能的Mandelbrot集合视频制作器，使用 C++20 编写，结合SIMD、多线程与OpenCV库，实现视频生成。
+高性能的Mandelbrot集合视频制作器，使用 C++20 编写，结合 SIMD、多线程管理与 OpenCV 库，实现视频生成。
 
 ![Static Badge](https://img.shields.io/badge/C++-20-%2300599C?logo=cplusplus)
 ![GitHub repo size](https://img.shields.io/github/repo-size/UnderOrangeTree/MandelbrotExplorer)
@@ -8,11 +8,10 @@
 ~~首先，这个仓库是个史山，请不要在这个上花费太多的时间~~
 
 ## 特性
-- 🚀 SIMD 加速计算 – 使用AVX或NEON，每次迭代同时处理多个像素点。
+- 🚀 SIMD 加速计算 – 使用 AVX、NEON等SIMD指令集，每次迭代同时处理多个像素点。
 - 🧵 多线程渲染 – 按水平条带分割图像，每个 CPU 核心处理一个条带。
-- 🎨 彩色可视化 – 采用黑体辐射颜色映射以及泛光效果。
+- 🎨 彩色可视化 – 采用<6000K黑体辐射颜色映射。
 - 🎥 视频导出 – 生成 MP4 视频，支持平滑缩放动画。
-- 📊 性能分析 – 输出各阶段耗时 CSV 文件，方便性能调优。
 
 ## 环境要求
 - 支持 C++20 的编译器
@@ -34,7 +33,7 @@ make # 编译
 ```
 
 程序的默认行为：
-- 计算并渲染分辨率1920×1080、时长10秒的曼德勃罗集动画。
+- 计算并渲染分辨率 1920×1080、时长 10 秒的曼德勃罗集动画。
 - 将视频保存为当前目录下的 mandelbrot.mp4。
 - 在终端打印渲染进度和性能统计。
 - 生成 timings.csv 文件，包含各阶段详细耗时数据。
