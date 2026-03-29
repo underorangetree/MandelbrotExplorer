@@ -1,5 +1,4 @@
 #pragma once
-#include <cstddef>
 #include <cstdint>
 #include <opencv2/opencv.hpp>
 #include "ThreadPool.h"
@@ -30,5 +29,4 @@ private:
 public:
     void generate();
     cv::Mat& render();
-    
 };

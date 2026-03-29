@@ -1,15 +1,18 @@
 #include <algorithm>
 #include <chrono>
 #include <csignal>
-#include <cstddef>
 #include <format>
 #include "ExitStatus.h"
 #include "Mandelbrot.h"
 
 // TODO:
 // - setView使用的函数配置文件
-// BENCHMARK:
-// 400x225 60FPS 10s MI=1000 2000ms
+// BENCHMARK: 400x225 60FPS 10s MI=1000
+// x64 i5 10400 - 6 cores, 12 threads
+//  AVX 2000ms
+// ARM - 8 threads
+//  NEON 5400ms
+//  NO-SIMD 8100ms
 
 using timePoint = std::chrono::time_point<std::chrono::system_clock>;
 

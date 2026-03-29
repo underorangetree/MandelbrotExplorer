@@ -15,8 +15,8 @@ private:
     std::mutex mtx;
     std::condition_variable cv;
     bool stop;
-    std::condition_variable idle_cv;
-    std::atomic<std::size_t> active_threads;
+    std::atomic<size_t> pending_tasks;
+    std::condition_variable pending_cv;
 public:
     explicit ThreadPool(size_t n = std::thread::hardware_concurrency());
     ~ThreadPool();
