@@ -24,9 +24,7 @@ public:
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
     float* getIteration_data() const noexcept { return iteration_data; }
 private:
-    void row_generate(size_t y);
-    void row_color_render(size_t y);
+    void row_task(size_t y);
 public:
-    void generate();
-    cv::Mat& render();
+    cv::Mat& generate();
 };

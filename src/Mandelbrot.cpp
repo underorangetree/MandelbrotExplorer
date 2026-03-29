@@ -49,8 +49,9 @@ void Mandelbrot::setView(double new_zoom, double new_offset_x, double new_offset
         i_data[y] = std::fma(y - (image_height / 2.0), delta, offsetY);
     }
 }
-void Mandelbrot::row_generate(size_t y) {
-    float* iteration_row = iteration_data + y * width;
+void Mandelbrot::row_task(size_t y) {
+    // iterate part
+    float* const iteration_row = iteration_data + y * width;
     #if defined (__AVX__)
         const __m256d y_vec = _mm256_set1_pd(i_data[y]);
         const __m256d zeros = _mm256_setzero_pd();
@@ -126,14 +127,11 @@ void Mandelbrot::row_generate(size_t y) {
             iteration_row[x] = iter;
         }
     #endif
-}
-void Mandelbrot::row_color_render(size_t y) {
+    // color part
     const float a = 4.0f;
     const float min_kelvin = 100.0f;
     const float max_kelvin = 6000.0f;
-    // 这里不推荐SIMD
-    uint8_t* row_ptr = image.data + y * image.step;
-    float* iteration_row = iteration_data + y * width;
+    uint8_t* const row_ptr = image.data + y * image.step;
     for (size_t x = 0; x < image_width; ++x) {
         float iter = iteration_row[x];
         if (iter >= max_iterations) {
@@ -154,14 +152,9 @@ void Mandelbrot::row_color_render(size_t y) {
         }
     }
 }
-void Mandelbrot::generate() {
+cv::Mat& Mandelbrot::generate() {
     for (size_t y = 0; y < height; ++y) {
-        thread_pool.enqueue([this, y]() { row_generate(y); });
-    }
-}
-cv::Mat& Mandelbrot::render() {
-    for (size_t y = 0; y < height; ++y) {
-        thread_pool.enqueue([this, y]() { row_color_render(y); });
+        thread_pool.enqueue([this, y]() { row_task(y); });
     }
     thread_pool.wait_all_idle();
     return image;
