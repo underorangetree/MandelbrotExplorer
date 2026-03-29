@@ -9,7 +9,7 @@
 // - setView使用的函数配置文件
 // BENCHMARK: 400x225 60FPS 10s MI=1000
 // x64 i5 10400 - 6 cores, 12 threads
-//  AVX 2000ms
+//  AVX 2200ms
 // ARM - 8 threads
 //  NEON 5400ms
 //  NO-SIMD 8100ms
@@ -169,8 +169,7 @@ int main(int argc, char* argv[]) {
         zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, DURATION_SECONDS * FPS));
         mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
         timePoint start = std::chrono::system_clock::now();
-        mandelbrot.generate();
-        cv::Mat& image = mandelbrot.render();
+        cv::Mat& image = mandelbrot.generate();
         timePoint end = std::chrono::system_clock::now();
         double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1'000'000.0;
         progress_update_elapsed += elapsed;
