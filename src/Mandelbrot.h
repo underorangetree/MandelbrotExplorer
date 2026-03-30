@@ -1,11 +1,10 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <opencv2/opencv.hpp>
 #include "ThreadPool.h"
 class Mandelbrot {
 private:
-    const size_t image_width;
-    const size_t image_height;
     const size_t width;
     const size_t height;
     const uint32_t max_iterations;
@@ -15,16 +14,14 @@ private:
     double offsetY = 0.0;
     double* const r_data;
     double* const i_data;
-    float* const iteration_data;
     ThreadPool thread_pool;
     cv::Mat image;
 public:
     Mandelbrot(size_t _width = 1920, size_t _height = 1080, uint32_t _maxIterations = 1000);
     ~Mandelbrot();
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
-    float* getIteration_data() const noexcept { return iteration_data; }
 private:
     void row_task(size_t y);
 public:
-    cv::Mat& generate();
+    [[__nodiscard__]] cv::Mat& generate();
 };
