@@ -51,12 +51,13 @@ void Mandelbrot::row_task(size_t y) {
     const float min_kelvin = 100.0f;
     const float max_kelvin = 6000.0f;
     uint8_t* const row_ptr = image.data + y * image.step;
-    #if !defined (__AVX__)
+    #if defined (__AVX__)
         const size_t simd_size = 4;
         alignas(32) int64_t iterations[simd_size];
         const __m256d y_vec = _mm256_set1_pd(i_data[y]);
         const __m256d zeros = _mm256_setzero_pd();
         const __m256i zeros_int = _mm256_setzero_si256();
+        const __m256d twos = _mm256_set1_pd(2.0);
         const __m256d fours = _mm256_set1_pd(4.0);
         for (size_t x = 0; x < width; x += simd_size) {
             const __m256d x_vec = _mm256_load_pd(r_data + x);
@@ -72,7 +73,12 @@ void Mandelbrot::row_task(size_t y) {
                 if (_mm256_movemask_pd(continue_mask) == 0)
                     break;
                 iteration_vec = _mm256_sub_epi64(iteration_vec, _mm256_castpd_si256(continue_mask));
-                i = _mm256_add_pd(_mm256_add_pd(ri, ri), y_vec);
+                #if defined(__FMA__)
+                    i = _mm256_fmadd_pd(twos, ri, y_vec);
+                #else
+                    i = _mm256_add_pd(_mm256_add_pd(ri, ri), y_vec);
+                #endif
+                i = _mm256_fmadd_pd(twos, ri, y_vec);
                 r = _mm256_add_pd(r2, _mm256_sub_pd(x_vec, i2));
                 i2 = _mm256_mul_pd(i, i);
                 r2 = _mm256_mul_pd(r, r);
