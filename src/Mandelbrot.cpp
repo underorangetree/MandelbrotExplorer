@@ -51,7 +51,7 @@ void Mandelbrot::row_task(size_t y) {
     const float min_kelvin = 100.0f;
     const float max_kelvin = 6000.0f;
     uint8_t* const row_ptr = image.data + y * image.step;
-    #if defined (__AVX__)
+    #if defined(__AVX__)
         const size_t simd_size = 4;
         alignas(32) int64_t iterations[simd_size];
         const __m256d y_vec = _mm256_set1_pd(i_data[y]);
@@ -112,8 +112,8 @@ void Mandelbrot::row_task(size_t y) {
         alignas(16) int64_t iterations[simd_size];
         const float64x2_t y_vec = vdupq_n_f64(i_data[y]);
         const float64x2_t zeros = vdupq_n_f64(0.0);
-        const int64x2_t zeros_int = vdupq_n_s64(0);
-        const float64x2_t ones = vdupq_n_f64(1.0);
+        const uint64x2_t zeros_int = vdupq_n_u64(0);
+        const float64x2_t twos = vdupq_n_f64(2.0);
         const float64x2_t fours = vdupq_n_f64(4.0);
         for (size_t x = 0; x < width; x += 2) {
             const float64x2_t x_vec = vld1q_f64(r_data + x);
@@ -122,21 +122,21 @@ void Mandelbrot::row_task(size_t y) {
             float64x2_t ri = zeros;
             float64x2_t r2 = zeros;
             float64x2_t i2 = zeros;
-            int64x2_t iteration_vec = zeros_int;
+            uint64x2_t iteration_vec = zeros_int;
             float64x2_t mod_squared_vec = zeros;
             for (uint32_t iter = 0; iter < max_iterations; ++iter) {
                 uint64x2_t continue_mask = vcltq_f64(mod_squared_vec, fours);
                 if (vaddvq_u64(continue_mask) == 0)
                     break;
-                iteration_vec = vsubq_f64(iteration_vec, continue_mask);
-                i = vaddq_f64(vaddq_f64(ri, ri), y_vec);
+                iteration_vec = vsubq_u64(iteration_vec, continue_mask);
+                i = vfmaq_f64(y_vec, ri, twos);
                 r = vaddq_f64(r2, vsubq_f64(x_vec, i2));
                 i2 = vmulq_f64(i, i);
                 r2 = vmulq_f64(r, r);
                 ri = vmulq_f64(r, i);
                 mod_squared_vec = vaddq_f64(r2, i2);
             }
-            vst1_s64(iterations, iteration_vec);
+            vst1q_s64(iterations, vreinterpretq_s64_u64(iteration_vec));
             for (size_t dx = 0; dx < simd_size; ++dx) {
                 uint8_t* const pixel_ptr = row_ptr + (x + dx) * 3;
                 int64_t iter = iterations[dx];

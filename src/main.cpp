@@ -5,20 +5,11 @@
 #include "ExitStatus.h"
 #include "Mandelbrot.h"
 
-// TODO:
-// - setView使用的函数配置文件
-// BENCHMARK: 400x225 60FPS 10s MI=1000
-// x64 i5 10400 - 6 cores, 12 threads
-//  AVX 2200ms
-// ARM - 8 threads
-//  NEON 5400ms
-//  NO-SIMD 8100ms
-
 using timePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-size_t WIDTH = 400;
-size_t HEIGHT = 225;
-uint32_t MAX_ITER = 1000;
+size_t WIDTH = 1920;
+size_t HEIGHT = 1080;
+uint32_t MAX_ITER = 2000;
 double FPS = 60.0;
 double DURATION_SECONDS = 10.0;
 std::string OUTPUT_FILE = "mandelbrot.mp4";
