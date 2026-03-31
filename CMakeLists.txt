@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(MandelbrotExplorer VERSION 0.3.0
+project(MandelbrotExplorer VERSION 0.4.0
         DESCRIPTION "A Mandelbrot set explorer using OpenCV"
         LANGUAGES CXX)
 
