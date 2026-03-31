@@ -1,6 +1,8 @@
 #include "ThreadPool.h"
-ThreadPool::ThreadPool(size_t n) : stop(false), pending_tasks(0) {
-    for (size_t i = 0; i < n; ++i) {
+ThreadPool::ThreadPool(size_t max_tasks) {
+    tasks.reserve(max_tasks);
+    size_t num_threads = std::max(1U, std::thread::hardware_concurrency());
+    for (size_t i = 0; i < num_threads; ++i) {
         workers.emplace_back([this] {
             while (true) {
                 Task task;
@@ -8,12 +10,16 @@ ThreadPool::ThreadPool(size_t n) : stop(false), pending_tasks(0) {
                     std::unique_lock<std::mutex> lock(mtx);
                     cv.wait(lock, [this] { return stop || !tasks.empty(); });
                     if (stop && tasks.empty()) return;
-                    task = std::move(tasks.front());
-                    tasks.pop();
+                    task = std::move(tasks.back());
+                    tasks.pop_back();
                 }
                 task();
-                if (pending_tasks.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                    pending_cv.notify_all();
+                {
+                    std::unique_lock<std::mutex> lock(mtx);
+                    --pending_tasks;
+                    if (pending_tasks == 0) {
+                        pending_cv.notify_all();
+                    }
                 }
             }
         });
@@ -35,12 +41,12 @@ void ThreadPool::enqueue(Task task) {
         if (stop) {
             throw std::runtime_error("Try to add Task on stopped ThreadPool");
         }
-        tasks.emplace(std::move(task));
-        pending_tasks.fetch_add(1, std::memory_order_release);
+        tasks.emplace_back(std::move(task));
+        ++pending_tasks;
     }
     cv.notify_one();
 }
 void ThreadPool::wait_all_idle() {
     std::unique_lock<std::mutex> lock(mtx);
-    pending_cv.wait(lock, [this] { return pending_tasks.load(std::memory_order_acquire) == 0; });
+    pending_cv.wait(lock, [this] { return pending_tasks == 0; });
 }
