@@ -5,12 +5,12 @@
 #include "ExitStatus.h"
 #include "Mandelbrot.h"
 
-using timePoint = std::chrono::time_point<std::chrono::system_clock>;
+using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-size_t WIDTH = 1920;
-size_t HEIGHT = 1080;
-uint32_t MAX_ITER = 2000;
-double FPS = 60.0;
+size_t WIDTH = 640;
+size_t HEIGHT = 360;
+uint32_t MAX_ITER = 1000;
+double FPS = 30.0;
 double DURATION_SECONDS = 10.0;
 std::string OUTPUT_FILE = "mandelbrot.mp4";
 const double PROGRESS_UPDATE_INTERVAL = 0.5;
@@ -23,6 +23,9 @@ static double smooth(double a, double b, double t, double t0) {
 }
 
 #ifdef _WIN32
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <windows.h>
     static int get_terminal_width() {
         HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -40,7 +43,7 @@ static double smooth(double a, double b, double t, double t0) {
         if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0) {
             return w.ws_col;
         }
-        char *cols = getenv("COLUMNS");
+        char* cols = getenv("COLUMNS");
         if (cols) return atoi(cols);
         return 100;
     }
@@ -159,9 +162,9 @@ int main(int argc, char* argv[]) {
         if (sigint_flag) break;
         zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, DURATION_SECONDS * FPS));
         mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
-        timePoint start = std::chrono::system_clock::now();
+        TimePoint start = std::chrono::system_clock::now();
         cv::Mat& image = mandelbrot.generate();
-        timePoint end = std::chrono::system_clock::now();
+        TimePoint end = std::chrono::system_clock::now();
         double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1'000'000.0;
         progress_update_elapsed += elapsed;
         render_speed = 0.63 * render_speed + 0.37 / elapsed;

@@ -16,8 +16,10 @@ find_package(OpenCV REQUIRED)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/ExitStatus.h
-    src/Mandelbrot.cpp
     src/Mandelbrot.h
+    src/Mandelbrot_avx2.cpp
+    src/Mandelbrot_scalar.cpp
+    src/Mandelbrot_neon.cpp
     src/ThreadPool.cpp
     src/ThreadPool.h
 )
