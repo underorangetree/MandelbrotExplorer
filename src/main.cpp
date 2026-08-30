@@ -2,15 +2,20 @@
 #include <chrono>
 #include <csignal>
 #include <format>
+#include <string>
+#include <thread>
+#include <cmath>
+#include <unordered_map>
+#include <iostream>
 #include "ExitStatus.h"
 #include "Mandelbrot.h"
 
 using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-size_t WIDTH = 640;
-size_t HEIGHT = 360;
-uint32_t MAX_ITER = 1000;
-double FPS = 30.0;
+size_t WIDTH = 1920;
+size_t HEIGHT = 1080;
+uint32_t MAX_ITER = 2000;
+double FPS = 60.0;
 double DURATION_SECONDS = 10.0;
 std::string OUTPUT_FILE = "mandelbrot.mp4";
 const double PROGRESS_UPDATE_INTERVAL = 0.5;

@@ -18,7 +18,7 @@ Mandelbrot::Mandelbrot(size_t _width, size_t _height, size_t _maxIterations):
     max_iterations(_maxIterations),
     r_data(static_cast<double*>(operator new(width * sizeof(double), std::align_val_t(32), std::nothrow))),
     i_data(static_cast<double*>(operator new(height * sizeof(double), std::align_val_t(32), std::nothrow))),
-    thread_pool(static_cast<size_t>(std::max(1U, std::thread::hardware_concurrency()))),
+    thread_pool(height),
     image(height, width, CV_8UC3) {
         if (r_data == nullptr || i_data == nullptr || !image.isContinuous()) {
             std::cerr << "Memory allocation failed.\n";

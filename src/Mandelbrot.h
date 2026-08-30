@@ -1,7 +1,9 @@
 #pragma once
 #include <cstddef>
-#include <opencv2/opencv.hpp>
+#include <cstdint>
+#include <array>
 #include <vector>
+#include <opencv2/opencv.hpp>
 #include "ThreadPool.h"
 class Mandelbrot {
 private:

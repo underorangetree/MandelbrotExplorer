@@ -15,7 +15,7 @@ Mandelbrot::Mandelbrot(size_t _width, size_t _height, size_t _maxIterations):
     max_iterations(_maxIterations),
     r_data(static_cast<double*>(operator new(width * sizeof(double), std::align_val_t(32), std::nothrow))),
     i_data(static_cast<double*>(operator new(height * sizeof(double), std::align_val_t(32), std::nothrow))),
-    thread_pool(static_cast<size_t>(std::max(1U, std::thread::hardware_concurrency()))),
+    thread_pool(height),
     image(height, width, CV_8UC3) {
         if (r_data == nullptr || i_data == nullptr || !image.isContinuous()) {
             std::cerr << "Memory allocation failed.\n";
@@ -68,14 +68,17 @@ void Mandelbrot::row_task(size_t y) {
         double r = 0.0, i = 0.0;
         double ri = 0.0;
         double r2 = 0.0, i2 = 0.0;
+        const double cr = r_data[x];
+        const double ci = i_data[y];
+        const double q = (cr - 0.25) * (cr - 0.25) + ci * ci;
         uint32_t iter = 0;
-        if ((r_data[x] + 1.0) * (r_data[x] + 1.0) + i_data[y] * i_data[y] <= 1.0 / 16.0 ||
-            (r_data[x] - 0.25) * (r_data[x] - 0.25) + i_data[y] * i_data[y] <= 0.25 * i_data[y] * i_data[y]) {
+        if ((cr + 1.0) * (cr + 1.0) + ci * ci <= 1.0 / 16.0 ||
+            q * (q + cr - 0.25) <= 0.25 * ci * ci) {
             iter = max_iterations;
         } else {
             while (r2 + i2 <= 4.0 && iter < max_iterations) {
-                i = std::fma(2.0, ri, i_data[y]);
-                r = r2 - i2 + r_data[x];
+                i = std::fma(2.0, ri, ci);
+                r = r2 - i2 + cr;
                 i2 = i * i;
                 r2 = r * r;
                 ri = r * i;
