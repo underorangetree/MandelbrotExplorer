@@ -1,0 +1,78 @@
+{
+    "version": 4,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 23,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "vcpkg-base",
+            "displayName": "Vcpkg Base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "ninja-vs",
+            "displayName": "Ninja + VS Compiler",
+            "inherits": "vcpkg-base",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_CXX_COMPILER": "cl"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "vs2022",
+            "displayName": "Visual Studio 2022",
+            "inherits": "vcpkg-base",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "vs2026",
+            "displayName": "Visual Studio 2026",
+            "inherits": "vcpkg-base",
+            "generator": "Visual Studio 18 2026",
+            "architecture": "x64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "vs2022-release",
+            "displayName": "Build VS2022 Release",
+            "configurePreset": "vs2022",
+            "configuration": "Release"
+        },
+        {
+            "name": "vs2026-release",
+            "displayName": "Build VS2026 Release",
+            "configurePreset": "vs2026",
+            "configuration": "Release"
+        },
+        {
+            "name": "ninja-vs-release",
+            "displayName": "Build Ninja + VS Release",
+            "configurePreset": "ninja-vs",
+            "configuration": "Release"
+        }
+    ]
+}

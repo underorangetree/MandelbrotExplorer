@@ -14,11 +14,16 @@ private:
     std::mutex mtx;
     std::condition_variable cv;
     bool stop = false;
-    size_t pending_tasks = 0;
+    int pending_tasks = 0;
     std::condition_variable pending_cv;
 public:
-    explicit ThreadPool(size_t max_tasks);
+    explicit ThreadPool(int max_tasks);
+    ThreadPool(const ThreadPool&) = delete;
+    auto operator=(const ThreadPool&) -> ThreadPool& = delete;
+    ThreadPool(ThreadPool&&) = delete;
+    auto operator=(ThreadPool&&) -> ThreadPool& = delete;
     ~ThreadPool();
     void enqueue(Task task);
     void wait_all_idle();
+    [[nodiscard]] auto thread_count() const -> int;
 };

@@ -1,0 +1,44 @@
+name: CMake on Windows (MSVC)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    # Chocolatey's prebuilt OpenCV is much faster to set up than building it
+    # from source via vcpkg. It installs to C:\tools\opencv.
+    - name: Install OpenCV
+      run: choco install opencv -y
+
+    - name: Locate and expose OpenCV
+      shell: pwsh
+      run: |
+        $root = "C:\tools\opencv"
+        $configDir = Join-Path $root "build"
+        if (-not (Test-Path $configDir)) {
+          throw "OpenCV CMake config directory not found at $configDir"
+        }
+        $archDir = Get-ChildItem (Join-Path $configDir "x64") -Directory | Select-Object -First 1
+        $binDir = Join-Path $archDir.FullName "bin"
+        $binDir | Out-File -FilePath $env:GITHUB_PATH -Append
+        "OpenCV_DIR=$configDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: Configure CMake
+      run: >
+        cmake -S . -B build
+        -G "Visual Studio 17 2022" -A x64
+        -DBUILD_TESTING=ON
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Test
+      run: ctest --test-dir build -C Release --output-on-failure

@@ -70,3 +70,9 @@ Testing/
 
 # text files
 *.txt
+
+# CMake Local Presets
+CMakeUserPresets.json
+
+# clangd
+.clangd
