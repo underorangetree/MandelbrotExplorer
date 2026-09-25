@@ -4,6 +4,7 @@
 
 ![Static Badge](https://img.shields.io/badge/C++-20-%2300599C?logo=cplusplus)
 ![GitHub repo size](https://img.shields.io/github/repo-size/UnderOrangeTree/MandelbrotExplorer)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 ~~首先，这个仓库是个史山，请不要在这个上花费太多的时间~~
 
@@ -95,4 +96,6 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 
 ## 许可证
 
-~~史山要什么许可证？~~
+本项目基于 [MIT 许可证](LICENSE) 发布。
+
+第三方依赖：[OpenCV](https://opencv.org/)（Apache-2.0 许可证），发布二进制时请一并保留其许可声明。
