@@ -8,7 +8,9 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Pin to the image that ships Visual Studio 2022 so the
+    # "Visual Studio 17 2022" generator below exists.
+    runs-on: windows-2022
 
     steps:
     - uses: actions/checkout@v6
