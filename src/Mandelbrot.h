@@ -1,31 +1,50 @@
 #pragma once
-#include <cstddef>
-#include <cstdint>
 #include <array>
+#include <cstdint>
+#include <memory>
+#include <new>
 #include <vector>
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #include "ThreadPool.h"
+#include "MandelbrotKernel.h"
 class Mandelbrot {
+public:
+    // Work-splitting strategy. Tiled is the default; PerRow reproduces the old
+    // one-task-per-row scheme and exists for benchmarking.
+    enum class Schedule : std::uint8_t { Tiled, PerRow };
 private:
-    const size_t width;
-    const size_t height;
-    const size_t max_iterations;
-    double zoom = 0.8;
-    double delta;
+    struct AlignedDelete {
+        void operator()(double* ptr) const noexcept {
+            operator delete(ptr, std::align_val_t(32));
+        }
+    };
+    const int width;
+    const int requested_width;
+    const int height;
+    const int max_iterations;
+    double zoom = 1.0;
+    double delta = 0.0;
     double offset_x = 0.0;
     double offset_y = 0.0;
     std::vector<std::array<uint8_t, 3>> color_map;
-    double* const r_data;
-    double* const i_data;
-
+    std::unique_ptr<double, AlignedDelete> r_data;
+    std::unique_ptr<double, AlignedDelete> i_data;
     ThreadPool thread_pool;
     cv::Mat image;
+    RowKernel kernel_ = nullptr;
+    const char* kernel_name_ = "unknown";
+    Schedule schedule_ = Schedule::Tiled;
 public:
-    Mandelbrot(size_t _width = 1920, size_t _height = 1080, size_t _maxIterations = 1000);
-    ~Mandelbrot();
+    Mandelbrot(int _width = 1920, int _height = 1080, int _maxIterations = 2000);
+    Mandelbrot(const Mandelbrot&) = delete;
+    auto operator=(const Mandelbrot&) -> Mandelbrot& = delete;
+    Mandelbrot(Mandelbrot&&) = delete;
+    auto operator=(Mandelbrot&&) -> Mandelbrot& = delete;
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
+    void set_schedule(Schedule schedule) { schedule_ = schedule; }
+    [[nodiscard]] auto kernel_name() const -> const char*;
 private:
-    void row_task(size_t y);
+    void render_tile(int row_index, int x_begin, int x_end);
 public:
-    [[__nodiscard__]] cv::Mat& generate();
+    [[nodiscard]] auto generate() -> cv::Mat;
 };
