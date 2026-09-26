@@ -14,6 +14,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 find_package(OpenCV REQUIRED COMPONENTS core videoio)
+find_package(Threads REQUIRED)
 
 add_library(mandelbrot_core STATIC
     src/CommandLine.cpp
@@ -29,7 +30,7 @@ add_library(mandelbrot_core STATIC
     src/ThreadPool.h
 )
 target_include_directories(mandelbrot_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(mandelbrot_core PUBLIC ${OpenCV_LIBS})
+target_link_libraries(mandelbrot_core PUBLIC ${OpenCV_LIBS} Threads::Threads)
 
 # Per-architecture kernels: only the kernel translation unit gets the arch flags,
 # so the rest of the binary stays on the baseline instruction set and can run on
