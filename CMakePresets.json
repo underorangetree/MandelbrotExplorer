@@ -7,22 +7,29 @@
     },
     "configurePresets": [
         {
-            "name": "vcpkg-base",
+            "name": "base-common",
+            "displayName": "Common Base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "base-vcpkg",
             "displayName": "Vcpkg Base",
             "hidden": true,
-            "binaryDir": "${sourceDir}/build/${presetName}",
+            "inherits": "base-common",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
         },
         {
-            "name": "ninja-vs",
-            "displayName": "Ninja + VS Compiler",
-            "inherits": "vcpkg-base",
+            "name": "windows-msvc-ninja",
+            "displayName": "Windows: Ninja + MSVC",
+            "inherits": "base-vcpkg",
             "generator": "Ninja",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl"
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_BUILD_TYPE": "Release"
             },
             "condition": {
                 "type": "equals",
@@ -31,9 +38,9 @@
             }
         },
         {
-            "name": "vs2022",
-            "displayName": "Visual Studio 2022",
-            "inherits": "vcpkg-base",
+            "name": "windows-msvc-vs2022",
+            "displayName": "Windows: Visual Studio 2022",
+            "inherits": "base-vcpkg",
             "generator": "Visual Studio 17 2022",
             "architecture": "x64",
             "condition": {
@@ -43,9 +50,9 @@
             }
         },
         {
-            "name": "vs2026",
-            "displayName": "Visual Studio 2026",
-            "inherits": "vcpkg-base",
+            "name": "windows-msvc-vs2026",
+            "displayName": "Windows: Visual Studio 2026",
+            "inherits": "base-vcpkg",
             "generator": "Visual Studio 18 2026",
             "architecture": "x64",
             "condition": {
@@ -53,26 +60,106 @@
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
             }
+        },
+        {
+            "name": "windows-mingw-gcc",
+            "displayName": "Windows: Ninja + MinGW GCC (MSYS2)",
+            "inherits": "base-common",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-mingw-clang",
+            "displayName": "Windows: Ninja + MinGW Clang (MSYS2 CLANG64)",
+            "inherits": "base-common",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "linux-gcc",
+            "displayName": "Linux: Ninja + GCC (system OpenCV)",
+            "inherits": "base-common",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "macos-brew",
+            "displayName": "macOS: Ninja + Apple Clang (Homebrew OpenCV)",
+            "inherits": "base-common",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_PREFIX_PATH": "/opt/homebrew;/usr/local"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
         }
     ],
     "buildPresets": [
         {
-            "name": "vs2022-release",
-            "displayName": "Build VS2022 Release",
-            "configurePreset": "vs2022",
+            "name": "windows-msvc-vs2022-release",
+            "displayName": "Build Windows MSVC VS2022 Release",
+            "configurePreset": "windows-msvc-vs2022",
             "configuration": "Release"
         },
         {
-            "name": "vs2026-release",
-            "displayName": "Build VS2026 Release",
-            "configurePreset": "vs2026",
+            "name": "windows-msvc-vs2026-release",
+            "displayName": "Build Windows MSVC VS2026 Release",
+            "configurePreset": "windows-msvc-vs2026",
             "configuration": "Release"
         },
         {
-            "name": "ninja-vs-release",
-            "displayName": "Build Ninja + VS Release",
-            "configurePreset": "ninja-vs",
-            "configuration": "Release"
+            "name": "windows-msvc-ninja-release",
+            "displayName": "Build Windows MSVC Ninja Release",
+            "configurePreset": "windows-msvc-ninja"
+        },
+        {
+            "name": "windows-mingw-gcc-release",
+            "displayName": "Build Windows MinGW GCC Release",
+            "configurePreset": "windows-mingw-gcc"
+        },
+        {
+            "name": "windows-mingw-clang-release",
+            "displayName": "Build Windows MinGW Clang Release",
+            "configurePreset": "windows-mingw-clang"
+        },
+        {
+            "name": "linux-gcc-release",
+            "displayName": "Build Linux GCC Release",
+            "configurePreset": "linux-gcc"
+        },
+        {
+            "name": "macos-brew-release",
+            "displayName": "Build macOS Homebrew Release",
+            "configurePreset": "macos-brew"
         }
     ]
 }

@@ -23,14 +23,42 @@
 ## 编译
 
 ### 使用 CMake Presets（推荐）
-先让 `VCPKG_ROOT` 指向 vcpkg，再在仓库根目录执行：
+Windows（MSVC + vcpkg）：先让 `VCPKG_ROOT` 指向 vcpkg，再在仓库根目录执行：
 
 ```bash
-cmake --preset vs2026            # 也可用 ninja-vs / vs2022
-cmake --build --preset vs2026-release
+cmake --preset windows-msvc-vs2026        # 或 windows-msvc-vs2022
+cmake --build --preset windows-msvc-vs2026-release
 ```
+`windows-msvc-ninja` 用法相同，但它硬编码了 `cl`，需要在 **Visual Studio 开发者命令行**（已运行 `vcvars64.bat`）里执行；`windows-msvc-vs2022`/`windows-msvc-vs2026`（VS 生成器）不需要。
 
 `CMakeUserPresets.json`（已被 gitignore）可以定义一个带 `VCPKG_ROOT` 的本地 `default` preset。
+
+Linux 使用系统 OpenCV（无需 vcpkg）：
+
+```bash
+sudo apt install libopencv-dev
+cmake --preset linux-gcc
+cmake --build --preset linux-gcc-release
+```
+
+macOS 使用 Homebrew（Apple Silicon 与 Intel 均适用）：
+
+```bash
+brew install opencv ninja cmake
+cmake --preset macos-brew
+cmake --build --preset macos-brew-release
+```
+
+Windows 上用 MSYS2 / MinGW（在对应的 MSYS2 shell 里执行）：
+
+```bash
+# UCRT64 示例；包名前缀按环境替换（MINGW64: mingw-w64-x86_64-，CLANG64: mingw-w64-clang-x86_64-）
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+                   mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-opencv
+cmake --preset windows-mingw-gcc          # CLANG64 用 windows-mingw-clang
+cmake --build --preset windows-mingw-gcc-release
+```
+需要 GCC 13+ 或 Clang 17+（`<format>`）。
 
 ### 手动配置
 ```bash
