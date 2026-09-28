@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Least privilege: the workflow only reads the repository (actions/checkout).
+permissions:
+  contents: read
+
 jobs:
   build:
     # Pin to the image that ships Visual Studio 2022 so the
