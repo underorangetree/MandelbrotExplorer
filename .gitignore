@@ -68,9 +68,6 @@ vcpkg_installed/
 Testing/
 .cache/
 
-# text files
-*.txt
-
 # CMake Local Presets
 CMakeUserPresets.json
 
