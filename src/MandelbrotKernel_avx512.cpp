@@ -32,7 +32,6 @@ void render_row_avx512(const RowContext& context) {
         __m512d i[chain_count];
         __mmask8 continue_mask[chain_count];
         __m512i iteration_vec[chain_count];
-#pragma unroll
         for (int c = 0; c < chain_count; ++c) {
             x_vec[c] = _mm512_loadu_pd(r_data + x + c * simd_size);
             r[c] = zeros;
@@ -53,7 +52,6 @@ void render_row_avx512(const RowContext& context) {
                                 static_cast<__mmask16>(continue_mask[2] | continue_mask[3])) != 0) {
                 break;
             }
-#pragma unroll
             for (int c = 0; c < chain_count; ++c) {
                 // One set of squares per chain, reused by the escape test and the
                 // step, so only r and i are carried between iterations.
@@ -66,7 +64,6 @@ void render_row_avx512(const RowContext& context) {
                 r[c] = _mm512_add_pd(r2, _mm512_sub_pd(x_vec[c], i2));
             }
         }
-#pragma unroll
         for (int c = 0; c < chain_count; ++c) {
             _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[c]), iteration_vec[c]);
         }

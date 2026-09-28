@@ -78,6 +78,9 @@ auto select_kernel() -> KernelSelection {
 
 auto find_kernel(const char* name) -> KernelSelection {
     const std::string_view requested{name};
+    if (requested == "auto") {
+        return select_kernel();
+    }
     if (requested == "scalar") {
         return {.function=render_row_scalar, .name="scalar"};
     }

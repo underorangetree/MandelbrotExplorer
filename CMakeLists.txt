@@ -80,11 +80,6 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(mandelbrot_tests tests/mandelbrot_tests.cpp)
     target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_core)
-    if(MSVC)
-        target_compile_options(mandelbrot_tests PRIVATE $<$<NOT:$<CONFIG:Debug>>:/UNDEBUG>)
-    else()
-        target_compile_options(mandelbrot_tests PRIVATE $<$<NOT:$<CONFIG:Debug>>:-UNDEBUG>)
-    endif()
     add_test(NAME unit COMMAND mandelbrot_tests)
 
     add_executable(mandelbrot_benchmark tests/benchmark.cpp)
@@ -95,7 +90,7 @@ if(BUILD_TESTING)
     add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
     set_tests_properties(cli_invalid_size PROPERTIES WILL_FAIL TRUE)
 
-    add_test(NAME cli_small_render COMMAND ${PROJECT_NAME} -s 16x16 --maxiter 16 --fps 1 --duration 1 -o ctest_out.mp4)
+    add_test(NAME cli_small_render COMMAND ${PROJECT_NAME} -s 320x240 --maxiter 16 --fps 1 --duration 1 -o ctest_out.mp4)
     # ExitStatus::VideoWriterError == 3: treated as "skipped" so the test does not
     # fail on OpenCV builds without a usable video writer backend.
     set_tests_properties(cli_small_render PROPERTIES

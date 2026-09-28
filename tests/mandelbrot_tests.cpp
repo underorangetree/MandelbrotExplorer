@@ -1,7 +1,8 @@
 #include <array>
 #include <atomic>
-#include <cassert>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <new>
 #include <optional>
@@ -15,6 +16,16 @@
 #include "MandelbrotKernel.h"
 #include "ThreadPool.h"
 
+// Always-on check: unlike CHECK(), it fires even with NDEBUG defined, so the
+// tests cannot silently become no-ops in a Release build.
+#define CHECK(condition)                                                                        \
+    do {                                                                                        \
+        if (!(condition)) {                                                                     \
+            std::fprintf(stderr, "CHECK failed: %s (%s:%d)\n", #condition, __FILE__, __LINE__); \
+            std::abort();                                                                       \
+        }                                                                                       \
+    } while (false)
+
 namespace {
 
 auto parse(std::vector<std::string>& storage, RenderConfig& config) -> std::optional<ExitStatus> {
@@ -26,19 +37,42 @@ auto parse(std::vector<std::string>& storage, RenderConfig& config) -> std::opti
     return parse_command_line({argv.data(), argv.size()}, config);
 }
 
+// Escape-time checks for two known points, independent of the color map: the
+// color entries encode the iteration count.
+void test_known_point_iterations() {
+    constexpr int max_iterations = 128;
+    const double real_parts[2] = {0.0, 1.0};
+    std::vector<std::array<uint8_t, 3>> color_map(max_iterations + 1);
+    for (int iter = 0; iter <= max_iterations; ++iter) {
+        color_map[iter] = {static_cast<uint8_t>(iter & 0xFF),
+                           static_cast<uint8_t>((iter >> 8) & 0xFF),
+                           static_cast<uint8_t>((iter >> 16) & 0xFF)};
+    }
+    std::vector<uint8_t> buffer(2 * 3);
+    const RowContext context{.r_data=real_parts, .ci=0.0, .row_ptr=buffer.data(), .x_begin=0, .x_end=2, .max_iterations=max_iterations, .color_map=color_map.data()};
+    render_row_scalar(context);
+    const auto iteration_at = [&buffer](int index) -> int {
+        return static_cast<int>(buffer[index * 3]) |
+               (static_cast<int>(buffer[index * 3 + 1]) << 8) |
+               (static_cast<int>(buffer[index * 3 + 2]) << 16);
+    };
+    CHECK(iteration_at(0) == max_iterations); // (0,0) is inside the set
+    CHECK(iteration_at(1) > 0);               // (1,0) escapes
+    CHECK(iteration_at(1) < 10);              // ... quickly
+}
+
 void test_mandelbrot_known_points() {
     Mandelbrot mandelbrot(16, 16, 64);
     mandelbrot.setView(1.0, 0.0, 0.0);
     cv::Mat image = mandelbrot.generate();
-    assert(image.cols == 16 && image.rows == 16);
-    assert(image.at<cv::Vec3b>(8, 8) == cv::Vec3b(0, 0, 0));   // (0,0) is in the set
-    assert(image.at<cv::Vec3b>(8, 12) != cv::Vec3b(0, 0, 0));  // (1,0) escapes
+    CHECK(image.cols == 16 && image.rows == 16);
+    CHECK(image.at<cv::Vec3b>(8, 8) == cv::Vec3b(0, 0, 0)); // (0,0) is in the set; interior is black
 }
 
 void test_crop_to_requested_width() {
     Mandelbrot mandelbrot(17, 16, 64);
     cv::Mat image = mandelbrot.generate();
-    assert(image.cols == 17 && image.rows == 16);
+    CHECK(image.cols == 17 && image.rows == 16);
 }
 
 void test_schedule_equivalence() {
@@ -50,8 +84,8 @@ void test_schedule_equivalence() {
     per_row.set_schedule(Mandelbrot::Schedule::PerRow);
     const cv::Mat a = tiled.generate();
     const cv::Mat b = per_row.generate();
-    assert(a.size() == b.size());
-    assert(cv::norm(a, b, cv::NORM_INF) == 0.0);
+    CHECK(a.size() == b.size());
+    CHECK(cv::norm(a, b, cv::NORM_INF) == 0.0);
 }
 
 void test_thread_pool() {
@@ -61,41 +95,44 @@ void test_thread_pool() {
         pool.enqueue([&count] { ++count; });
     }
     pool.wait_all_idle();
-    assert(count == 100);
+    CHECK(count == 100);
 }
 
 void test_kernel_selection() {
     const KernelSelection selection = select_kernel();
-    assert(selection.function != nullptr);
-    assert(selection.name != nullptr);
-    // The scalar kernel is always available; unknown names are rejected.
-    assert(find_kernel("scalar").function != nullptr);
-    assert(find_kernel("bogus").function == nullptr);
+    CHECK(selection.function != nullptr);
+    CHECK(selection.name != nullptr);
+    // The scalar kernel is always available; "auto" resolves to the best kernel
+    // for this CPU; unknown names are rejected.
+    CHECK(find_kernel("scalar").function != nullptr);
+    CHECK(find_kernel("auto").function != nullptr);
+    CHECK(find_kernel("bogus").function == nullptr);
     Mandelbrot mandelbrot(8, 8, 16);
-    assert(mandelbrot.kernel_name() != nullptr);
-    assert(mandelbrot.set_kernel("scalar"));
-    assert(!mandelbrot.set_kernel("bogus"));
+    CHECK(mandelbrot.kernel_name() != nullptr);
+    CHECK(mandelbrot.set_kernel("scalar"));
+    CHECK(!mandelbrot.set_kernel("bogus"));
 }
 
 void test_command_line_success() {
     RenderConfig config;
+    CHECK(config.kernel == "auto"); // default
     std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar"};
     auto result = parse(args, config);
-    assert(!result.has_value());
-    assert(config.kernel == "scalar");
-    assert(config.width == 100);
-    assert(config.height == 50);
-    assert(config.max_iterations == 10);
-    assert(config.fps == 2.0);
-    assert(config.duration_seconds == 3.0);
-    assert(config.output_file == "out.mp4");
+    CHECK(!result.has_value());
+    CHECK(config.kernel == "scalar");
+    CHECK(config.width == 100);
+    CHECK(config.height == 50);
+    CHECK(config.max_iterations == 10);
+    CHECK(config.fps == 2.0);
+    CHECK(config.duration_seconds == 3.0);
+    CHECK(config.output_file == "out.mp4");
 }
 
 void test_command_line_help() {
     RenderConfig config;
     std::vector<std::string> args = {"prog", "--help"};
     auto result = parse(args, config);
-    assert(result.has_value() && *result == ExitStatus::Success);
+    CHECK(result.has_value() && *result == ExitStatus::Success);
 }
 
 void test_command_line_errors() {
@@ -130,7 +167,7 @@ void test_command_line_errors() {
         RenderConfig config;
         std::vector<std::string> mutable_args = args;
         auto result = parse(mutable_args, config);
-        assert(result.has_value() && *result == ExitStatus::InvalidArgument);
+        CHECK(result.has_value() && *result == ExitStatus::InvalidArgument);
     }
 }
 
@@ -140,13 +177,14 @@ void test_command_line_boundaries_accepted() {
         {"prog", "--size", "1x32768", "--fps", "0.001", "--duration", "2000"},
         {"prog", "--maxiter", "1"},
         {"prog", "--width", "32768"},
-        {"prog", "--height", "32768"}
+        {"prog", "--height", "32768"},
+        {"prog", "--kernel", "auto"}
     };
     for (const auto& args : valid) {
         RenderConfig config;
         std::vector<std::string> mutable_args = args;
         auto result = parse(mutable_args, config);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 }
 
@@ -156,16 +194,17 @@ struct AlignedDelete {
     }
 };
 
-// Renders the same rows with the scalar kernel and with the CPU-selected kernel
-// and compares the buffers byte for byte. The color map encodes the iteration
-// count, so any difference in the escape-time result shows up as a byte diff.
+// Renders the same rows with the scalar kernel and with every kernel available
+// in this build and supported by the CPU, then compares the buffers byte for
+// byte. The color map encodes the iteration count, so any difference in the
+// escape-time result shows up as a byte diff.
 void test_kernel_matches_scalar() {
     constexpr int width = 32;
     constexpr int height = 8;
     constexpr int max_iterations = 200;
     constexpr double delta = 4.0 / (width > height ? width : height) / 1.5;
 
-    // The AVX2 kernel uses aligned loads, so r_data must be 32-byte aligned.
+    // The vector kernels use aligned loads, so r_data must be 32-byte aligned.
     const std::unique_ptr<double, AlignedDelete> r_data(
         static_cast<double*>(operator new(sizeof(double) * width, std::align_val_t(32))));
     std::vector<double> i_data(height);
@@ -185,18 +224,51 @@ void test_kernel_matches_scalar() {
                            static_cast<uint8_t>((iter >> 16) & 0xFF)};
     }
 
-    const RowKernel kernel = select_kernel().function;
     for (int row = 0; row < height; ++row) {
-        const RowContext scalar_context{r_data.get(), i_data[row],
-                                        scalar_buffer.data() + static_cast<size_t>(row) * width * 3,
-                                        0, width, max_iterations, color_map.data()};
-        render_row_scalar(scalar_context);
-        const RowContext kernel_context{r_data.get(), i_data[row],
-                                        kernel_buffer.data() + static_cast<size_t>(row) * width * 3,
-                                        0, width, max_iterations, color_map.data()};
-        kernel(kernel_context);
+        const RowContext context{.r_data=r_data.get(), .ci=i_data[row],
+                                 .row_ptr=scalar_buffer.data() + static_cast<size_t>(row) * width * 3,
+                                 .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data()};
+        render_row_scalar(context);
     }
-    assert(scalar_buffer == kernel_buffer);
+
+    for (const char* name : {"avx512", "avx2", "neon"}) {
+        const KernelSelection selection = find_kernel(name);
+        if (selection.function == nullptr) {
+            continue; // not compiled into this build, or unsupported by this CPU
+        }
+        for (int row = 0; row < height; ++row) {
+            const RowContext context{.r_data=r_data.get(), .ci=i_data[row],
+                                     .row_ptr=kernel_buffer.data() + static_cast<size_t>(row) * width * 3,
+                                     .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data()};
+            selection.function(context);
+        }
+        CHECK(kernel_buffer == scalar_buffer);
+    }
+}
+
+// Every kernel must produce the same image through the full framework
+// (coordinate setup, padding, scheduling, cropping) as the scalar kernel.
+void test_forced_kernel_rendering() {
+    Mandelbrot automatic(64, 32, 64);
+    automatic.setView(1.0, 0.0, 0.0);
+    const cv::Mat reference = automatic.generate();
+
+    Mandelbrot forced_scalar(64, 32, 64);
+    forced_scalar.setView(1.0, 0.0, 0.0);
+    CHECK(forced_scalar.set_kernel("scalar"));
+    CHECK(std::string(forced_scalar.kernel_name()) == "scalar");
+    CHECK(cv::norm(forced_scalar.generate(), reference, cv::NORM_INF) == 0.0);
+
+    for (const char* name : {"avx512", "avx2", "neon"}) {
+        if (find_kernel(name).function == nullptr) {
+            continue;
+        }
+        Mandelbrot forced(64, 32, 64);
+        forced.setView(1.0, 0.0, 0.0);
+        CHECK(forced.set_kernel(name));
+        CHECK(std::string(forced.kernel_name()) == name);
+        CHECK(cv::norm(forced.generate(), reference, cv::NORM_INF) == 0.0);
+    }
 }
 
 void test_mandelbrot_constructor_validation() {
@@ -206,7 +278,7 @@ void test_mandelbrot_constructor_validation() {
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    assert(threw);
+    CHECK(threw);
 
     threw = false;
     try {
@@ -214,7 +286,7 @@ void test_mandelbrot_constructor_validation() {
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    assert(threw);
+    CHECK(threw);
 
     threw = false;
     try {
@@ -222,7 +294,7 @@ void test_mandelbrot_constructor_validation() {
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    assert(threw);
+    CHECK(threw);
 
     threw = false;
     try {
@@ -230,7 +302,7 @@ void test_mandelbrot_constructor_validation() {
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    assert(threw);
+    CHECK(threw);
 
     threw = false;
     try {
@@ -238,12 +310,13 @@ void test_mandelbrot_constructor_validation() {
     } catch (const std::invalid_argument&) {
         threw = true;
     }
-    assert(threw);
+    CHECK(threw);
 }
 
 } // namespace
 
 auto main() -> int {
+    test_known_point_iterations();
     test_mandelbrot_known_points();
     test_crop_to_requested_width();
     test_schedule_equivalence();
@@ -254,6 +327,7 @@ auto main() -> int {
     test_command_line_errors();
     test_command_line_boundaries_accepted();
     test_kernel_matches_scalar();
+    test_forced_kernel_rendering();
     test_mandelbrot_constructor_validation();
     return 0;
 }
