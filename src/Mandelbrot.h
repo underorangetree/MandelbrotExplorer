@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <new>
@@ -31,6 +32,8 @@ private:
     std::unique_ptr<double, AlignedDelete> i_data;
     ThreadPool thread_pool;
     cv::Mat image;
+    uint8_t* output_data_ = nullptr;
+    std::size_t output_step_ = 0;
     RowKernel kernel_ = nullptr;
     const char* kernel_name_ = "unknown";
     Schedule schedule_ = Schedule::Tiled;
@@ -50,4 +53,12 @@ private:
     void render_tile(int row_index, int x_begin, int x_end);
 public:
     [[nodiscard]] auto generate() -> cv::Mat;
+    // Padded width of the storage a frame must provide: the kernels render whole
+    // 32-column blocks, so a smaller buffer would be written past its rows.
+    [[nodiscard]] auto storage_width() const -> int { return width; }
+    // Renders into `target` (CV_8UC3, `height` rows, at least `storage_width()`
+    // columns) instead of the internal buffer, so several frames can be in
+    // flight without copying. The caller must keep `target` untouched until the
+    // frame has been consumed.
+    auto generate_into(cv::Mat& target) -> void;
 };

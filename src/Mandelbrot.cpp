@@ -45,6 +45,8 @@ Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations):
     if (!image.isContinuous()) {
         throw std::runtime_error("cv::Mat image is not continuous");
     }
+    output_data_ = image.data;
+    output_step_ = image.step;
     const KernelSelection selection = select_kernel();
     kernel_ = selection.function;
     kernel_name_ = selection.name;
@@ -83,7 +85,7 @@ void Mandelbrot::render_tile(int row_index, int x_begin, int x_end) {
     const RowContext context{
         r_data.get(),
         i_data.get()[row_index],
-        image.data + (static_cast<size_t>(row_index) * image.step),
+        output_data_ + (static_cast<size_t>(row_index) * output_step_),
         x_begin,
         x_end,
         max_iterations,
@@ -93,33 +95,45 @@ void Mandelbrot::render_tile(int row_index, int x_begin, int x_end) {
 }
 
 auto Mandelbrot::generate() -> cv::Mat {
+    generate_into(image);
+    return image(cv::Rect(0, 0, requested_width, height));
+}
+
+auto Mandelbrot::generate_into(cv::Mat& target) -> void {
+    if (target.type() != CV_8UC3 || target.rows != height || target.cols < width) {
+        throw std::invalid_argument("frame buffer must be CV_8UC3 with " + std::to_string(height) +
+                                    " rows and at least " + std::to_string(width) + " columns");
+    }
+    output_data_ = target.data;
+    output_step_ = target.step;
     if (schedule_ == Schedule::PerRow) {
         for (int row_index = 0; row_index < height; ++row_index) {
             thread_pool.enqueue([this, row_index]() { render_tile(row_index, 0, width); });
         }
         thread_pool.wait_all_idle();
-        return image(cv::Rect(0, 0, requested_width, height));
-    }
-
-    // Row-based work stealing: the unit of work is one full row and workers pull
-    // the next row from an atomic counter. Enqueuing only as many tasks as there
-    // are workers removes the per-row enqueue overhead while preserving the
-    // sequential row access pattern (good locality for r_data and the image).
-    std::atomic<int> next_row{0};
-    const int workers = thread_pool.thread_count();
-    for (int worker = 0; worker < workers; ++worker) {
-        thread_pool.enqueue([this, &next_row]() {
-            for (;;) {
-                const int row_index = next_row.fetch_add(1, std::memory_order_relaxed);
-                if (row_index >= height) {
-                    return;
+    } else {
+        // Row-based work stealing: the unit of work is one full row and workers
+        // pull the next row from an atomic counter. Enqueuing only as many tasks
+        // as there are workers removes the per-row enqueue overhead while
+        // preserving the sequential row access pattern (good locality for r_data
+        // and the image).
+        std::atomic<int> next_row{0};
+        const int workers = thread_pool.thread_count();
+        for (int worker = 0; worker < workers; ++worker) {
+            thread_pool.enqueue([this, &next_row]() {
+                for (;;) {
+                    const int row_index = next_row.fetch_add(1, std::memory_order_relaxed);
+                    if (row_index >= height) {
+                        return;
+                    }
+                    render_tile(row_index, 0, width);
                 }
-                render_tile(row_index, 0, width);
-            }
-        });
+            });
+        }
+        thread_pool.wait_all_idle();
     }
-    thread_pool.wait_all_idle();
-    return image(cv::Rect(0, 0, requested_width, height));
+    output_data_ = image.data;
+    output_step_ = image.step;
 }
 
 auto Mandelbrot::kernel_name() const -> const char* {

@@ -41,8 +41,8 @@ With the Visual Studio generator, `cmake --build` needs `--config Release` (or u
 Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_render` is skipped (exit code 3) when no usable video backend is available; that is expected.
 
 ## Layout
-- `src/main.cpp` - entry point (`run()` plus top-level exception handling) and progress output.
-- `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cropping.
+- `src/main.cpp` - entry point (`run()` plus top-level exception handling), progress output, and the render->encode pipeline (a small frame-buffer pool feeding a writer thread).
+- `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cropping, and `generate_into()` for zero-copy rendering into caller-owned buffers.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.
 - `src/ThreadPool.{h,cpp}` - thread pool.
@@ -57,6 +57,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - Runtime dispatch: when changing kernels or adding an architecture, update the CPU detection and `KernelSelection` in `MandelbrotKernel.cpp`.
 - The scalar kernel is a bit-exact reference: `MandelbrotKernel_scalar.cpp` must mirror the SIMD kernels operation for operation (same `std::fma` usage, same association, same `< 4.0` escape test), otherwise `test_kernel_matches_scalar` fails.
 - Width padding and cropping: the framework pads the width to a multiple of 32 (the widest kernel block is 16 columns, so 32 stays a safe multiple); `generate()` returns an ROI cropped to the requested width (possibly a non-continuous `cv::Mat`; the video writer handles `step`).
+- Frame buffers: `generate_into()` targets must be `CV_8UC3` with `height` rows and at least `storage_width()` columns (the padded width); `main.cpp` rotates a small pool so the writer thread can encode one frame while the next is being rendered, and never reuses a buffer before its frame has been consumed.
 - Validation: both the CLI and the `Mandelbrot` constructor validate inputs; invalid constructor arguments throw `std::invalid_argument` rather than calling `std::exit`.
 - Exit codes: `ExitStatus` is used both as the process exit code and as the CLI tests' `SKIP_RETURN_CODE` (3 when no video backend is available).
 - Timing uses `steady_clock`; `elapsed`/`total_elapsed` can be 0, so guard divisions.

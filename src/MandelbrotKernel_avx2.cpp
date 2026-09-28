@@ -4,6 +4,8 @@
 
 namespace {
 constexpr int simd_size = 4;
+// Dead lanes cannot change again, so an exit check every other iteration is enough.
+constexpr int iteration_check_period = 2;
 }
 
 void render_row_avx2(const RowContext& context) {
@@ -71,7 +73,8 @@ void render_row_avx2(const RowContext& context) {
             continue_mask_b = _mm256_and_pd(
                 continue_mask_b,
                 _mm256_cmp_pd(_mm256_add_pd(r2_b, i2_b), fours, _CMP_LT_OQ));
-            if (_mm256_movemask_pd(continue_mask_a) == 0 && _mm256_movemask_pd(continue_mask_b) == 0)
+            if ((iter % iteration_check_period) == 0 &&
+                _mm256_movemask_pd(continue_mask_a) == 0 && _mm256_movemask_pd(continue_mask_b) == 0)
                 break;
             iteration_vec_a = _mm256_sub_epi64(iteration_vec_a, _mm256_castpd_si256(continue_mask_a));
             iteration_vec_b = _mm256_sub_epi64(iteration_vec_b, _mm256_castpd_si256(continue_mask_b));

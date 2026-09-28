@@ -272,6 +272,50 @@ void test_forced_kernel_rendering() {
     }
 }
 
+// generate_into() must render the same pixels as generate() into a
+// caller-provided storage buffer, and must reject buffers the kernels would
+// write past (wrong type, too few rows, narrower than the padded width).
+void test_generate_into() {
+    Mandelbrot mandelbrot(64, 32, 64);
+    mandelbrot.setView(1.0, -0.5, 0.0);
+    const cv::Mat reference = mandelbrot.generate();
+
+    cv::Mat storage(32, mandelbrot.storage_width(), CV_8UC3);
+    mandelbrot.generate_into(storage);
+    CHECK(cv::norm(storage(cv::Rect(0, 0, 64, 32)), reference, cv::NORM_INF) == 0.0);
+
+    cv::Mat wider(32, mandelbrot.storage_width() + 32, CV_8UC3);
+    mandelbrot.generate_into(wider);
+    CHECK(cv::norm(wider(cv::Rect(0, 0, 64, 32)), reference, cv::NORM_INF) == 0.0);
+
+    bool threw = false;
+    try {
+        cv::Mat wrong_type(32, mandelbrot.storage_width(), CV_8UC1);
+        mandelbrot.generate_into(wrong_type);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    threw = false;
+    try {
+        cv::Mat too_narrow(32, mandelbrot.storage_width() - 1, CV_8UC3);
+        mandelbrot.generate_into(too_narrow);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    threw = false;
+    try {
+        cv::Mat wrong_height(31, mandelbrot.storage_width(), CV_8UC3);
+        mandelbrot.generate_into(wrong_height);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+}
+
 // Regression: GCC/Clang may contract a*b+c into an FMA in one kernel but not in
 // another, which changes the rounding of a few boundary pixels. These rows come
 // from the default 1280x720 view at zoom 1.0 and contain pixels that diverge
@@ -378,6 +422,7 @@ auto main() -> int {
     test_command_line_boundaries_accepted();
     test_kernel_matches_scalar();
     test_forced_kernel_rendering();
+    test_generate_into();
     test_kernel_rounding_ties();
     test_mandelbrot_constructor_validation();
     return 0;

@@ -1,13 +1,18 @@
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <csignal>
 #include <cmath>
+#include <cstddef>
+#include <deque>
 #include <exception>
 #include <format>
 #include <iostream>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 #include <opencv2/core.hpp>
 #include <opencv2/videoio.hpp>
 #include "ExitStatus.h"
@@ -90,31 +95,127 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
         return static_cast<int>(ExitStatus::VideoWriterError);
     }
     std::cout << std::format("Video will be saved to {}. Using {} threads. Kernel: {}.\n", config.output_file, std::max(1U, std::thread::hardware_concurrency()), mandelbrot.kernel_name());
+
+    // Render and encode form a producer/consumer pipeline: the main thread
+    // renders frame N+1 into a free buffer while the writer thread encodes frame
+    // N. A few buffers are enough to keep the encoder busy; the queue bounds how
+    // many frames can be in flight, so memory stays flat if the encoder is slow.
+    constexpr std::size_t frame_buffer_count = 3;
+    struct FrameBuffer {
+        cv::Mat storage;  // padded width, written by the kernels
+        cv::Mat view;     // cropped to the requested width, handed to the encoder
+    };
+    std::vector<FrameBuffer> frame_buffers;
+    frame_buffers.reserve(frame_buffer_count);
+    std::deque<int> free_indices;
+    for (std::size_t index = 0; index < frame_buffer_count; ++index) {
+        FrameBuffer buffer;
+        buffer.storage = cv::Mat(config.height, mandelbrot.storage_width(), CV_8UC3);
+        buffer.view = buffer.storage(cv::Rect(0, 0, config.width, config.height));
+        frame_buffers.push_back(std::move(buffer));
+        free_indices.push_back(static_cast<int>(index));
+    }
+
+    std::mutex queue_mutex;
+    std::condition_variable free_cv;
+    std::condition_variable ready_cv;
+    std::deque<int> ready_indices;
+    bool pipeline_done = false;
+    std::exception_ptr writer_error;
+
+    // The writer is the only thread that touches the VideoWriter. It encodes
+    // every queued frame before exiting and reports failures back to run().
+    std::thread writer_thread([&] {
+        for (;;) {
+            int index = -1;
+            {
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                ready_cv.wait(lock, [&] { return !ready_indices.empty() || pipeline_done; });
+                if (ready_indices.empty()) {
+                    return;
+                }
+                index = ready_indices.front();
+                ready_indices.pop_front();
+            }
+            try {
+                writer.write(frame_buffers[static_cast<std::size_t>(index)].view);
+            } catch (...) {
+                {
+                    std::lock_guard<std::mutex> lock(queue_mutex);
+                    writer_error = std::current_exception();
+                    pipeline_done = true;
+                }
+                free_cv.notify_all();
+                ready_cv.notify_all();
+                return;
+            }
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex);
+                free_indices.push_back(index);
+            }
+            free_cv.notify_one();
+        }
+    });
+
+    const double total_frames = config.fps * config.duration_seconds;
     double zoom = NAN;
     double render_speed = 0.0;
     double progress_update_elapsed = 0;
     int frame = 0;
     auto render_start_time = std::chrono::steady_clock::now();
-    for (; frame < config.fps * config.duration_seconds; ++frame) {
-        if (sigint_flag != 0) {
-            break;
+    try {
+        for (; frame < total_frames; ++frame) {
+            if (sigint_flag != 0) {
+                break;
+            }
+            int index = -1;
+            {
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                free_cv.wait(lock, [&] { return !free_indices.empty() || pipeline_done; });
+                if (free_indices.empty()) {
+                    break; // the writer thread reported an error
+                }
+                index = free_indices.front();
+                free_indices.pop_front();
+            }
+            zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, total_frames));
+            mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
+            TimePoint start = std::chrono::steady_clock::now();
+            mandelbrot.generate_into(frame_buffers[static_cast<std::size_t>(index)].storage);
+            TimePoint end = std::chrono::steady_clock::now();
+            double elapsed = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1'000'000.0;
+            progress_update_elapsed += elapsed;
+            if (elapsed > 0.0) {
+                render_speed = (0.63 * render_speed) + (0.37 / elapsed);
+            }
+            if (progress_update_elapsed > progress_update_interval) {
+                progress(static_cast<double>(frame) / total_frames);
+                std::cout << std::format("Frame {:>3} rendered in {:#.4g} ms. Approximate speed {:#.4g} FPS.", frame, elapsed * 1000, render_speed) << std::flush;
+                progress_update_elapsed = 0;
+            }
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex);
+                ready_indices.push_back(index);
+            }
+            ready_cv.notify_one();
         }
-        zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, config.duration_seconds * config.fps));
-        mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
-        TimePoint start = std::chrono::steady_clock::now();
-        cv::Mat image = mandelbrot.generate();
-        TimePoint end = std::chrono::steady_clock::now();
-        double elapsed = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1'000'000.0;
-        progress_update_elapsed += elapsed;
-        if (elapsed > 0.0) {
-            render_speed = (0.63 * render_speed) + (0.37 / elapsed);
+    } catch (...) {
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            pipeline_done = true;
         }
-        if (progress_update_elapsed > progress_update_interval) {
-            progress(static_cast<double>(frame) / (config.fps * config.duration_seconds));
-            std::cout << std::format("Frame {:>3} rendered in {:#.4g} ms. Approximate speed {:#.4g} FPS.", frame, elapsed * 1000, render_speed) << std::flush;
-            progress_update_elapsed = 0;
-        }
-        writer.write(image);
+        ready_cv.notify_all();
+        writer_thread.join();
+        throw;
+    }
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex);
+        pipeline_done = true;
+    }
+    ready_cv.notify_all();
+    writer_thread.join();
+    if (writer_error != nullptr) {
+        std::rethrow_exception(writer_error);
     }
     std::cout << "\r\033[2K";
     if (sigint_flag != 0) {
