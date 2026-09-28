@@ -12,6 +12,7 @@ struct RenderConfig {
     double duration_seconds = 10.0;
     std::string output_file = "mandelbrot.mp4";
     std::string kernel = "auto"; // auto, scalar, avx2, avx512, neon
+    int threads = 0;             // 0 = auto (hardware_concurrency)
 };
 
 // Parses command-line arguments into config.

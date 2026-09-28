@@ -2,9 +2,11 @@
 #include <algorithm>
 #include <stdexcept>
 
-ThreadPool::ThreadPool(int max_tasks) {
+ThreadPool::ThreadPool(int max_tasks, int thread_count) {
     tasks.reserve(max_tasks);
-    const int num_threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int num_threads = thread_count > 0
+        ? thread_count
+        : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
     try {
         for (int i = 0; i < num_threads; ++i) {
             workers.emplace_back([this] {

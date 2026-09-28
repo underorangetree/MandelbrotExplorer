@@ -89,6 +89,7 @@ Linux 上可先 `sudo apt install libopencv-dev`；Windows 上手动使用 vcpkg
 --maxiter <value>     单点最大迭代次数（默认 2000）
 --fps <value>         帧率（默认 60）
 --duration <value>    时长，单位秒（默认 10）
+--threads <value>     渲染线程数，0 = 自动（默认 0）
 --kernel <name>       强制使用指定内核：auto|scalar|avx2|avx512|neon（默认 auto）
 ```
 
@@ -98,7 +99,7 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 ```
 
 参数会被校验：宽/高 `[1, 32768]`、`--maxiter` `[1, 1000000]`、`--fps` `[0.001, 1000]`、
-`--duration` `[0.001, 86400]`，且 `FPS × 时长 ≥ 1` 帧；非法输入会打印错误并退出。
+`--duration` `[0.001, 86400]`、`--threads` `[0, 1024]`，且 `FPS × 时长 ≥ 1` 帧；非法输入会打印错误并退出。
 
 缩放动画曲线与目标中心点仍硬编码在 `main.cpp` 中。
 

@@ -38,7 +38,8 @@ private:
     const char* kernel_name_ = "unknown";
     Schedule schedule_ = Schedule::Tiled;
 public:
-    Mandelbrot(int _width = 1920, int _height = 1080, int _maxIterations = 2000);
+    // _threads = 0 selects std::thread::hardware_concurrency() render threads.
+    Mandelbrot(int _width = 1920, int _height = 1080, int _maxIterations = 2000, int _threads = 0);
     Mandelbrot(const Mandelbrot&) = delete;
     auto operator=(const Mandelbrot&) -> Mandelbrot& = delete;
     Mandelbrot(Mandelbrot&&) = delete;
@@ -46,6 +47,7 @@ public:
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
     void set_schedule(Schedule schedule) { schedule_ = schedule; }
     [[nodiscard]] auto kernel_name() const -> const char*;
+    [[nodiscard]] auto thread_count() const -> int;
     // Overrides the runtime-selected kernel. Returns false if the name is
     // unknown or the CPU does not support it.
     auto set_kernel(const char* name) -> bool;

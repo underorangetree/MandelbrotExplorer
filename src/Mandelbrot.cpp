@@ -27,20 +27,28 @@ auto validate_max_iterations(int value) -> int {
     return value;
 }
 
+auto validate_thread_count(int value) -> int {
+    if (value < 0 || value > mandelbrot::max_thread_count) {
+        throw std::invalid_argument("threads must be in [0, " +
+                                    std::to_string(mandelbrot::max_thread_count) + "], got " + std::to_string(value));
+    }
+    return value;
+}
+
 auto padded_width(int value) -> int {
     return (value + 31) & ~31; // pad to a multiple of 32 so the widest (AVX-512) kernel fits
 }
 
 } // namespace
 
-Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations):
+Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations, int _threads):
     width(padded_width(validate_dimension(_width, "width"))),
     requested_width(_width),
     height(validate_dimension(_height, "height")),
     max_iterations(validate_max_iterations(_maxIterations)),
     r_data(static_cast<double*>(operator new(static_cast<size_t>(width) * sizeof(double), std::align_val_t(32)))),
     i_data(static_cast<double*>(operator new(static_cast<size_t>(height) * sizeof(double), std::align_val_t(32)))),
-    thread_pool(height),
+    thread_pool(height, validate_thread_count(_threads)),
     image(height, width, CV_8UC3) {
     if (!image.isContinuous()) {
         throw std::runtime_error("cv::Mat image is not continuous");
@@ -138,6 +146,10 @@ auto Mandelbrot::generate_into(cv::Mat& target) -> void {
 
 auto Mandelbrot::kernel_name() const -> const char* {
     return kernel_name_;
+}
+
+auto Mandelbrot::thread_count() const -> int {
+    return thread_pool.thread_count();
 }
 
 auto Mandelbrot::set_kernel(const char* name) -> bool {

@@ -83,7 +83,7 @@ static void sigint_handler(int) {
 
 static auto run(const RenderConfig& config, double progress_update_interval) -> int {
     std::signal(SIGINT, sigint_handler);
-    Mandelbrot mandelbrot(config.width, config.height, config.max_iterations);
+    Mandelbrot mandelbrot(config.width, config.height, config.max_iterations, config.threads);
     if (config.kernel != "auto" && !mandelbrot.set_kernel(config.kernel.c_str())) {
         std::cerr << "Requested kernel '" << config.kernel << "' is not available on this CPU/build.\n";
         return static_cast<int>(ExitStatus::InvalidArgument);
@@ -94,7 +94,7 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
         std::cerr << "Could not open the output video file for write.\n";
         return static_cast<int>(ExitStatus::VideoWriterError);
     }
-    std::cout << std::format("Video will be saved to {}. Using {} threads. Kernel: {}.\n", config.output_file, std::max(1U, std::thread::hardware_concurrency()), mandelbrot.kernel_name());
+    std::cout << std::format("Video will be saved to {}. Using {} threads. Kernel: {}.\n", config.output_file, mandelbrot.thread_count(), mandelbrot.kernel_name());
 
     // Render and encode form a producer/consumer pipeline: the main thread
     // renders frame N+1 into a free buffer while the writer thread encodes frame

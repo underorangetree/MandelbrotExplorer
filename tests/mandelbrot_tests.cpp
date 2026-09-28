@@ -117,10 +117,11 @@ void test_kernel_selection() {
 void test_command_line_success() {
     RenderConfig config;
     CHECK(config.kernel == "auto"); // default
-    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar"};
+    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar", "--threads", "3"};
     auto result = parse(args, config);
     CHECK(!result.has_value());
     CHECK(config.kernel == "scalar");
+    CHECK(config.threads == 3);
     CHECK(config.width == 100);
     CHECK(config.height == 50);
     CHECK(config.max_iterations == 10);
@@ -162,7 +163,10 @@ void test_command_line_errors() {
         {"prog", "--size", "32769x1080"},
         {"prog", "--size", "10x-10"},
         {"prog", "--width", "abc"},
-        {"prog", "--kernel", "bogus"}
+        {"prog", "--kernel", "bogus"},
+        {"prog", "--threads", "-1"},
+        {"prog", "--threads", "abc"},
+        {"prog", "--threads", "1025"}
     };
     for (const auto& args : invalid) {
         RenderConfig config;
@@ -179,7 +183,9 @@ void test_command_line_boundaries_accepted() {
         {"prog", "--maxiter", "1"},
         {"prog", "--width", "32768"},
         {"prog", "--height", "32768"},
-        {"prog", "--kernel", "auto"}
+        {"prog", "--kernel", "auto"},
+        {"prog", "--threads", "0"},
+        {"prog", "--threads", "1024"}
     };
     for (const auto& args : valid) {
         RenderConfig config;
@@ -405,6 +411,25 @@ void test_mandelbrot_constructor_validation() {
         threw = true;
     }
     CHECK(threw);
+
+    threw = false;
+    try {
+        Mandelbrot invalid_threads_negative(16, 16, 16, -1);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    threw = false;
+    try {
+        Mandelbrot invalid_threads_range(16, 16, 16, 1025);
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    Mandelbrot threaded(16, 16, 16, 3);
+    CHECK(threaded.thread_count() == 3);
 }
 
 } // namespace

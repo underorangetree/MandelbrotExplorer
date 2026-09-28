@@ -11,6 +11,8 @@ constexpr int min_dimension = mandelbrot::min_dimension;
 constexpr int max_dimension = mandelbrot::max_dimension;
 constexpr int min_max_iter = mandelbrot::min_iteration_count;
 constexpr int max_max_iter = mandelbrot::max_iteration_count;
+constexpr int min_threads = 0; // 0 = auto
+constexpr int max_threads = mandelbrot::max_thread_count;
 constexpr double min_fps = 0.001;
 constexpr double max_fps = 1000.0;
 constexpr double min_duration = 0.001;
@@ -26,7 +28,8 @@ const std::unordered_map<std::string, int> subcommand_index = {
     {"--maxiter", 4},
     {"--fps", 5},
     {"--duration", 6},
-    {"--kernel", 7}
+    {"--kernel", 7},
+    {"--threads", 8}
 };
 
 auto parse_int(const std::string& value, const std::string& arg, int min_value, int max_value) -> std::optional<int> {
@@ -64,6 +67,7 @@ auto parse_double(const std::string& value, const std::string& arg, double min_v
 void print_usage(const char* program) {
     // Read the defaults from RenderConfig itself so this text cannot drift.
     const RenderConfig defaults;
+    const std::string default_threads = defaults.threads == 0 ? "auto" : std::to_string(defaults.threads);
     std::cout << "Usage: " << program << " [options]\n"
               << "Options:\n"
               << "  -h, --help             Show this help message and exit\n"
@@ -74,6 +78,7 @@ void print_usage(const char* program) {
               << "  --maxiter <value>      Set maximum iterations (default: " << defaults.max_iterations << ")\n"
               << "  --fps <value>          Set frames per second (default: " << defaults.fps << ")\n"
               << "  --duration <value>     Set duration in seconds (default: " << defaults.duration_seconds << ")\n"
+              << "  --threads <value>      Set render thread count, 0 = auto (default: " << default_threads << ")\n"
               << "  --kernel <name>        Force a kernel: auto|scalar|avx2|avx512|neon (default: " << defaults.kernel << ")\n";
 }
 
@@ -163,6 +168,14 @@ auto parse_command_line(std::span<char* const> args, RenderConfig& config) -> st
                     }
                     config.kernel = value;
                     break;
+                case 8: {
+                    auto parsed = parse_int(value, arg, min_threads, max_threads);
+                    if (!parsed) {
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.threads = *parsed;
+                    break;
+                }
                 default:
                     std::cerr << "Unsolved argument: " << arg << "\nPlease report this bug.\n";
                     return ExitStatus::Bug;

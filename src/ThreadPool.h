@@ -17,7 +17,8 @@ private:
     int pending_tasks = 0;
     std::condition_variable pending_cv;
 public:
-    explicit ThreadPool(int max_tasks);
+    // thread_count <= 0 selects std::thread::hardware_concurrency() workers.
+    explicit ThreadPool(int max_tasks, int thread_count = 0);
     ThreadPool(const ThreadPool&) = delete;
     auto operator=(const ThreadPool&) -> ThreadPool& = delete;
     ThreadPool(ThreadPool&&) = delete;
