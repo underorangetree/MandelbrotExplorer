@@ -32,6 +32,13 @@ add_library(mandelbrot_core STATIC
 target_include_directories(mandelbrot_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(mandelbrot_core PUBLIC ${OpenCV_LIBS} Threads::Threads)
 
+# Keep every kernel on the exact operation sequence written in the source.
+# Otherwise GCC/Clang may contract a*b+c into an FMA in one kernel but not in
+# another, and the kernels stop being bit-identical to the scalar reference.
+if(NOT MSVC)
+    set_source_files_properties(src/MandelbrotKernel_scalar.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+
 # Per-architecture kernels: only the kernel translation unit gets the arch flags,
 # so the rest of the binary stays on the baseline instruction set and can run on
 # CPUs that lack the extension. select_kernel() dispatches at runtime.
@@ -44,11 +51,12 @@ if(_mandelbrot_arch MATCHES "x86_64|amd64|x64|i[3-6]86")
         set_source_files_properties(src/MandelbrotKernel_avx2.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
         set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX512")
     else()
-        set_source_files_properties(src/MandelbrotKernel_avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma")
-        set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mfma")
+        set_source_files_properties(src/MandelbrotKernel_avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma;-ffp-contract=off")
+        set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mfma;-ffp-contract=off")
     endif()
 elseif((_mandelbrot_arch MATCHES "aarch64|arm64") AND NOT MSVC)
     target_sources(mandelbrot_core PRIVATE src/MandelbrotKernel_neon.cpp)
+    set_source_files_properties(src/MandelbrotKernel_neon.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 add_executable(${PROJECT_NAME} src/main.cpp)

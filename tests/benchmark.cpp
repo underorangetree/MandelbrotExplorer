@@ -16,10 +16,20 @@ struct Measurement {
     unsigned long long checksum;
 };
 
+void apply_kernel_from_env(Mandelbrot& mandelbrot) {
+    if (const char* const kernel = std::getenv("MB_KERNEL")) {
+        if (!mandelbrot.set_kernel(kernel)) {
+            std::fprintf(stderr, "Unknown kernel: %s\n", kernel);
+            std::exit(1);
+        }
+    }
+}
+
 auto measure(Mandelbrot::Schedule schedule, int width, int height, int max_iterations,
              int frames, double zoom, double center_x, double center_y) -> Measurement {
     Mandelbrot mandelbrot(width, height, max_iterations);
     mandelbrot.set_schedule(schedule);
+    apply_kernel_from_env(mandelbrot);
     mandelbrot.setView(zoom, center_x, center_y);
     mandelbrot.generate(); // warm-up
 
@@ -52,6 +62,7 @@ auto measure_animation_once(Mandelbrot::Schedule schedule, int width, int height
     constexpr double center_y = 0.131825904205311970493132056385139;
     Mandelbrot mandelbrot(width, height, max_iterations);
     mandelbrot.set_schedule(schedule);
+    apply_kernel_from_env(mandelbrot);
     const auto start = std::chrono::steady_clock::now();
     for (int frame = 0; frame < frames; ++frame) {
         const double zoom = 0.8 * std::pow(1.05, smoothstep(0.0, 280.0, frame, frames));

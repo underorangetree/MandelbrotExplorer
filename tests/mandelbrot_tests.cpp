@@ -1,5 +1,6 @@
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -271,6 +272,55 @@ void test_forced_kernel_rendering() {
     }
 }
 
+// Regression: GCC/Clang may contract a*b+c into an FMA in one kernel but not in
+// another, which changes the rounding of a few boundary pixels. These rows come
+// from the default 1280x720 view at zoom 1.0 and contain pixels that diverge
+// from the scalar reference when the AVX-512 kernel is compiled with FP
+// contraction enabled.
+void test_kernel_rounding_ties() {
+    constexpr int width = 1280;
+    constexpr int height = 720;
+    constexpr int max_iterations = 1000;
+    constexpr double delta = 4.0 / width;
+    constexpr int rows[] = {90, 93, 145, 160, 170, 172, 173, 181, 183, 184};
+
+    const std::unique_ptr<double, AlignedDelete> r_data(
+        static_cast<double*>(operator new(sizeof(double) * width, std::align_val_t(32))));
+    std::vector<std::array<uint8_t, 3>> color_map(max_iterations + 1);
+    std::vector<uint8_t> scalar_buffer(static_cast<size_t>(width) * 3);
+    std::vector<uint8_t> kernel_buffer(static_cast<size_t>(width) * 3);
+
+    for (int col = 0; col < width; ++col) {
+        r_data.get()[col] = std::fma(col - (width / 2), delta, -0.5);
+    }
+    for (int iter = 0; iter <= max_iterations; ++iter) {
+        color_map[iter] = {static_cast<uint8_t>(iter & 0xFF),
+                           static_cast<uint8_t>((iter >> 8) & 0xFF),
+                           static_cast<uint8_t>((iter >> 16) & 0xFF)};
+    }
+
+    for (const int row : rows) {
+        const RowContext context{.r_data=r_data.get(),
+                                 .ci=std::fma(row - (height / 2), delta, 0.0),
+                                 .row_ptr=scalar_buffer.data(),
+                                 .x_begin=0,
+                                 .x_end=width,
+                                 .max_iterations=max_iterations,
+                                 .color_map=color_map.data()};
+        render_row_scalar(context);
+        for (const char* name : {"avx512", "avx2", "neon"}) {
+            const KernelSelection selection = find_kernel(name);
+            if (selection.function == nullptr) {
+                continue; // not compiled into this build, or unsupported by this CPU
+            }
+            RowContext kernel_context = context;
+            kernel_context.row_ptr = kernel_buffer.data();
+            selection.function(kernel_context);
+            CHECK(kernel_buffer == scalar_buffer);
+        }
+    }
+}
+
 void test_mandelbrot_constructor_validation() {
     bool threw = false;
     try {
@@ -328,6 +378,7 @@ auto main() -> int {
     test_command_line_boundaries_accepted();
     test_kernel_matches_scalar();
     test_forced_kernel_rendering();
+    test_kernel_rounding_ties();
     test_mandelbrot_constructor_validation();
     return 0;
 }

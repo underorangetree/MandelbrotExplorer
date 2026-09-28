@@ -9,10 +9,10 @@ struct RowContext {
     const double* r_data;                     // real parts, indexed by column
     double ci;                                // imaginary part of this row
     uint8_t* row_ptr;                         // start of the output row (3 bytes per pixel)
-    // x_begin and x_end must be a multiple of the kernel's block size: 32 for
-    // AVX-512, 8 for AVX2, 4 for NEON, any value for the scalar kernel. The
-    // framework pads the width to 32 and always renders whole rows, so this
-    // holds today; keep it in mind before adding column tiling.
+    // x_begin and x_end must be a multiple of the kernel's block size: 16 for
+    // AVX-512 (two 8-wide chains), 8 for AVX2, 4 for NEON, any value for the
+    // scalar kernel. The framework pads the width to 32 and always renders
+    // whole rows, so this holds today; keep it in mind before adding column tiling.
     int x_begin;                              // first column of the tile
     int x_end;                                // one past the last column of the tile
     int max_iterations;

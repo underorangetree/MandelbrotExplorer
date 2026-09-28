@@ -4,7 +4,7 @@
 
 namespace {
 constexpr int simd_size = 8;
-constexpr int chain_count = 4; // 4 independent chains hide the z = z^2 + c latency
+constexpr int chain_count = 2; // 2 independent chains hide the z = z^2 + c latency
 }
 
 void render_row_avx512(const RowContext& context) {
@@ -27,46 +27,66 @@ void render_row_avx512(const RowContext& context) {
     const __m512i max_iter_vec = _mm512_set1_epi64(max_iterations);
     const __m512i minus_one = _mm512_set1_epi64(-1);
     for (int x = x_begin; x < x_end; x += chain_count * simd_size) {
-        __m512d x_vec[chain_count];
-        __m512d r[chain_count];
-        __m512d i[chain_count];
-        __mmask8 continue_mask[chain_count];
-        __m512i iteration_vec[chain_count];
-        for (int c = 0; c < chain_count; ++c) {
-            x_vec[c] = _mm512_loadu_pd(r_data + x + c * simd_size);
-            r[c] = zeros;
-            i[c] = zeros;
-            // Before iterating, skip points inside the main cardioid or the
-            // period-2 bulb, since they never escape.
-            const __m512d xq = _mm512_sub_pd(x_vec[c], quarter);
+        const __m512d x_vec_0 = _mm512_loadu_pd(r_data + x);
+        const __m512d x_vec_1 = _mm512_loadu_pd(r_data + x + simd_size);
+        __m512d r_0 = zeros;
+        __m512d i_0 = zeros;
+        __m512d r_1 = zeros;
+        __m512d i_1 = zeros;
+        __m512i iteration_vec_0;
+        __m512i iteration_vec_1;
+        __mmask8 continue_mask_0;
+        __mmask8 continue_mask_1;
+        // Before iterating, skip points inside the main cardioid or the
+        // period-2 bulb, since they never escape.
+        // Cardioid: with q = (x - 0.25)^2 + y^2, points satisfying
+        // q * (q + (x - 0.25)) <= 0.25 * y^2 are inside.
+        // Period-2 bulb: points satisfying (x + 1)^2 + y^2 <= 1/16 are inside.
+        {
+            const __m512d xq = _mm512_sub_pd(x_vec_0, quarter);
             const __m512d q = _mm512_fmadd_pd(xq, xq, y2);
             const __mmask8 in_cardioid = _mm512_cmp_pd_mask(_mm512_mul_pd(q, _mm512_add_pd(q, xq)), y2_over_4, _CMP_LE_OQ);
-            const __m512d xp1 = _mm512_add_pd(x_vec[c], ones);
+            const __m512d xp1 = _mm512_add_pd(x_vec_0, ones);
             const __mmask8 in_bulb = _mm512_cmp_pd_mask(_mm512_fmadd_pd(xp1, xp1, y2), sixteenth, _CMP_LE_OQ);
-            continue_mask[c] = static_cast<__mmask8>(~(in_cardioid | in_bulb));
-            iteration_vec[c] = _mm512_maskz_mov_epi64(static_cast<__mmask8>(~continue_mask[c]), max_iter_vec);
+            continue_mask_0 = static_cast<__mmask8>(~(in_cardioid | in_bulb));
+            iteration_vec_0 = _mm512_maskz_mov_epi64(static_cast<__mmask8>(~continue_mask_0), max_iter_vec);
+        }
+        {
+            const __m512d xq = _mm512_sub_pd(x_vec_1, quarter);
+            const __m512d q = _mm512_fmadd_pd(xq, xq, y2);
+            const __mmask8 in_cardioid = _mm512_cmp_pd_mask(_mm512_mul_pd(q, _mm512_add_pd(q, xq)), y2_over_4, _CMP_LE_OQ);
+            const __m512d xp1 = _mm512_add_pd(x_vec_1, ones);
+            const __mmask8 in_bulb = _mm512_cmp_pd_mask(_mm512_fmadd_pd(xp1, xp1, y2), sixteenth, _CMP_LE_OQ);
+            continue_mask_1 = static_cast<__mmask8>(~(in_cardioid | in_bulb));
+            iteration_vec_1 = _mm512_maskz_mov_epi64(static_cast<__mmask8>(~continue_mask_1), max_iter_vec);
         }
         for (int iter = 0; iter < max_iterations; ++iter) {
-            // Test the four masks without moving them to general-purpose registers.
-            if (_mm512_kortestz(static_cast<__mmask16>(continue_mask[0] | continue_mask[1]),
-                                static_cast<__mmask16>(continue_mask[2] | continue_mask[3])) != 0) {
+            // One set of squares per chain, reused by the escape test and the
+            // step, so only r and i are carried between iterations.
+            {
+                const __m512d r2 = _mm512_mul_pd(r_0, r_0);
+                const __m512d i2 = _mm512_mul_pd(i_0, i_0);
+                const __m512d ri = _mm512_mul_pd(r_0, i_0);
+                continue_mask_0 = _mm512_mask_cmp_pd_mask(continue_mask_0, _mm512_add_pd(r2, i2), fours, _CMP_LT_OQ);
+                iteration_vec_0 = _mm512_mask_sub_epi64(iteration_vec_0, continue_mask_0, iteration_vec_0, minus_one);
+                i_0 = _mm512_fmadd_pd(twos, ri, y_vec);
+                r_0 = _mm512_add_pd(r2, _mm512_sub_pd(x_vec_0, i2));
+            }
+            {
+                const __m512d r2 = _mm512_mul_pd(r_1, r_1);
+                const __m512d i2 = _mm512_mul_pd(i_1, i_1);
+                const __m512d ri = _mm512_mul_pd(r_1, i_1);
+                continue_mask_1 = _mm512_mask_cmp_pd_mask(continue_mask_1, _mm512_add_pd(r2, i2), fours, _CMP_LT_OQ);
+                iteration_vec_1 = _mm512_mask_sub_epi64(iteration_vec_1, continue_mask_1, iteration_vec_1, minus_one);
+                i_1 = _mm512_fmadd_pd(twos, ri, y_vec);
+                r_1 = _mm512_add_pd(r2, _mm512_sub_pd(x_vec_1, i2));
+            }
+            if ((iter & 3) == 0 && !(continue_mask_0 | continue_mask_1)) {
                 break;
             }
-            for (int c = 0; c < chain_count; ++c) {
-                // One set of squares per chain, reused by the escape test and the
-                // step, so only r and i are carried between iterations.
-                const __m512d r2 = _mm512_mul_pd(r[c], r[c]);
-                const __m512d i2 = _mm512_mul_pd(i[c], i[c]);
-                const __m512d ri = _mm512_mul_pd(r[c], i[c]);
-                continue_mask[c] = _mm512_mask_cmp_pd_mask(continue_mask[c], _mm512_add_pd(r2, i2), fours, _CMP_LT_OQ);
-                iteration_vec[c] = _mm512_mask_sub_epi64(iteration_vec[c], continue_mask[c], iteration_vec[c], minus_one);
-                i[c] = _mm512_fmadd_pd(twos, ri, y_vec);
-                r[c] = _mm512_add_pd(r2, _mm512_sub_pd(x_vec[c], i2));
-            }
         }
-        for (int c = 0; c < chain_count; ++c) {
-            _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[c]), iteration_vec[c]);
-        }
+        _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[0]), iteration_vec_0);
+        _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[1]), iteration_vec_1);
         for (int c = 0; c < chain_count; ++c) {
             for (int d = 0; d < simd_size; ++d) {
                 uint8_t* const pixel_ptr = row_ptr + (x + c * simd_size + d) * 3;
