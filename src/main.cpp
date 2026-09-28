@@ -79,6 +79,10 @@ static void sigint_handler(int) {
 static auto run(const RenderConfig& config, double progress_update_interval) -> int {
     std::signal(SIGINT, sigint_handler);
     Mandelbrot mandelbrot(config.width, config.height, config.max_iterations);
+    if (config.kernel != "auto" && !mandelbrot.set_kernel(config.kernel.c_str())) {
+        std::cerr << "Requested kernel '" << config.kernel << "' is not available on this CPU/build.\n";
+        return static_cast<int>(ExitStatus::InvalidArgument);
+    }
     auto fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
     cv::VideoWriter writer(config.output_file, fourcc, config.fps, cv::Size(config.width, config.height));
     if (!writer.isOpened()) {

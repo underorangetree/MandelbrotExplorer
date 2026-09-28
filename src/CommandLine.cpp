@@ -25,7 +25,8 @@ const std::unordered_map<std::string, int> subcommand_index = {
     {"--height", 3},
     {"--maxiter", 4},
     {"--fps", 5},
-    {"--duration", 6}
+    {"--duration", 6},
+    {"--kernel", 7}
 };
 
 auto parse_int(const std::string& value, const std::string& arg, int min_value, int max_value) -> std::optional<int> {
@@ -72,7 +73,8 @@ void print_usage(const char* program) {
               << "  --height <value>       Set video height (default: " << defaults.height << ")\n"
               << "  --maxiter <value>      Set maximum iterations (default: " << defaults.max_iterations << ")\n"
               << "  --fps <value>          Set frames per second (default: " << defaults.fps << ")\n"
-              << "  --duration <value>     Set duration in seconds (default: " << defaults.duration_seconds << ")\n";
+              << "  --duration <value>     Set duration in seconds (default: " << defaults.duration_seconds << ")\n"
+              << "  --kernel <name>        Force a kernel: auto|scalar|avx2|avx512|neon (default: " << defaults.kernel << ")\n";
 }
 
 } // namespace
@@ -152,6 +154,15 @@ auto parse_command_line(std::span<char* const> args, RenderConfig& config) -> st
                     config.duration_seconds = *parsed;
                     break;
                 }
+                case 7:
+                    if (value != "auto" && value != "scalar" && value != "avx2" &&
+                        value != "avx512" && value != "neon") {
+                        std::cerr << "Unknown kernel for " << arg << ": " << value
+                                  << " (expected auto, scalar, avx2, avx512, or neon)\n";
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.kernel = value;
+                    break;
                 default:
                     std::cerr << "Unsolved argument: " << arg << "\nPlease report this bug.\n";
                     return ExitStatus::Bug;

@@ -24,7 +24,12 @@ struct KernelSelection {
 
 void render_row_scalar(const RowContext& context);
 void render_row_avx2(const RowContext& context);
+void render_row_avx512(const RowContext& context);
 void render_row_neon(const RowContext& context);
 
 // Picks the best kernel available for the CPU executing this process.
 [[nodiscard]] auto select_kernel() -> KernelSelection;
+
+// Returns the named kernel if it exists in this build and the CPU supports it;
+// otherwise returns a selection with a null function pointer.
+[[nodiscard]] auto find_kernel(const char* name) -> KernelSelection;

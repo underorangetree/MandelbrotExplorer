@@ -9,7 +9,7 @@
 ~~首先，这个仓库是个史山，请不要在这个上花费太多的时间~~
 
 ## 特性
-- 🚀 运行时分派的 SIMD 加速 – 启动时按运行 CPU 自动选择标量 / AVX2（x86）/ NEON（ARM）内核，每次迭代同时处理多个像素点。
+- 🚀 运行时分派的 SIMD 加速 – 启动时按运行 CPU 自动选择标量 / AVX2 / AVX-512（x86）/ NEON（ARM）内核，每次迭代同时处理多个像素点。
 - 🧵 多线程渲染 – 线程池配合按行的原子任务窃取，动态均衡各行的负载。
 - 🎨 彩色可视化 – 采用近似 <6000K 黑体辐射颜色映射。
 - 🎥 视频导出 – 生成 MP4 视频，支持平滑缩放动画。
@@ -89,6 +89,7 @@ Linux 上可先 `sudo apt install libopencv-dev`；Windows 上手动使用 vcpkg
 --maxiter <value>     单点最大迭代次数（默认 2000）
 --fps <value>         帧率（默认 60）
 --duration <value>    时长，单位秒（默认 10）
+--kernel <name>       强制使用指定内核：auto|scalar|avx2|avx512|neon（默认 auto）
 ```
 
 示例：

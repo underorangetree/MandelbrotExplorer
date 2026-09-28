@@ -68,15 +68,21 @@ void test_kernel_selection() {
     const KernelSelection selection = select_kernel();
     assert(selection.function != nullptr);
     assert(selection.name != nullptr);
+    // The scalar kernel is always available; unknown names are rejected.
+    assert(find_kernel("scalar").function != nullptr);
+    assert(find_kernel("bogus").function == nullptr);
     Mandelbrot mandelbrot(8, 8, 16);
     assert(mandelbrot.kernel_name() != nullptr);
+    assert(mandelbrot.set_kernel("scalar"));
+    assert(!mandelbrot.set_kernel("bogus"));
 }
 
 void test_command_line_success() {
     RenderConfig config;
-    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4"};
+    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar"};
     auto result = parse(args, config);
     assert(!result.has_value());
+    assert(config.kernel == "scalar");
     assert(config.width == 100);
     assert(config.height == 50);
     assert(config.max_iterations == 10);
@@ -117,7 +123,8 @@ void test_command_line_errors() {
         {"prog", "--size", "1920X1080"},
         {"prog", "--size", "32769x1080"},
         {"prog", "--size", "10x-10"},
-        {"prog", "--width", "abc"}
+        {"prog", "--width", "abc"},
+        {"prog", "--kernel", "bogus"}
     };
     for (const auto& args : invalid) {
         RenderConfig config;

@@ -44,7 +44,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `src/main.cpp` - entry point (`run()` plus top-level exception handling) and progress output.
 - `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cropping.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
-- `src/MandelbrotKernel_{scalar,avx2,neon}.cpp` - per-architecture inner-loop kernels.
+- `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.
 - `src/ThreadPool.{h,cpp}` - thread pool.
 - `src/CommandLine.{h,cpp}` - CLI parsing and `RenderConfig`.
 - `src/MandelbrotLimits.h` - single source of truth for dimension/iteration bounds.
@@ -53,10 +53,10 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 
 ## Conventions and gotchas
 - Comments are in English; identifiers use `lower_snake_case`; 4-space indentation; `#pragma once` in headers; keep the return-type style of the file you are editing.
-- Architecture kernels: only `MandelbrotKernel_avx2.cpp` is compiled with `/arch:AVX2` (MSVC) or `-mavx2 -mfma` (GCC/Clang); every other translation unit stays on the baseline instruction set. The kernel files have no `#if` guards; CMake decides which one is compiled.
+- Architecture kernels: only `MandelbrotKernel_avx2.cpp` is compiled with `/arch:AVX2` (MSVC) or `-mavx2 -mfma` (GCC/Clang), and only `MandelbrotKernel_avx512.cpp` with `/arch:AVX512` or `-mavx512f`; every other translation unit stays on the baseline instruction set. The kernel files have no `#if` guards; CMake decides which ones are compiled.
 - Runtime dispatch: when changing kernels or adding an architecture, update the CPU detection and `KernelSelection` in `MandelbrotKernel.cpp`.
 - The scalar kernel is a bit-exact reference: `MandelbrotKernel_scalar.cpp` must mirror the SIMD kernels operation for operation (same `std::fma` usage, same association, same `< 4.0` escape test), otherwise `test_kernel_matches_scalar` fails.
-- Width padding and cropping: the framework pads the width to a multiple of 8; `generate()` returns an ROI cropped to the requested width (possibly a non-continuous `cv::Mat`; the video writer handles `step`).
+- Width padding and cropping: the framework pads the width to a multiple of 32 (the widest kernel processes 32 columns per iteration); `generate()` returns an ROI cropped to the requested width (possibly a non-continuous `cv::Mat`; the video writer handles `step`).
 - Validation: both the CLI and the `Mandelbrot` constructor validate inputs; invalid constructor arguments throw `std::invalid_argument` rather than calling `std::exit`.
 - Exit codes: `ExitStatus` is used both as the process exit code and as the CLI tests' `SKIP_RETURN_CODE` (3 when no video backend is available).
 - Timing uses `steady_clock`; `elapsed`/`total_elapsed` can be 0, so guard divisions.

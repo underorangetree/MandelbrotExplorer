@@ -11,6 +11,7 @@ struct RenderConfig {
     double fps = 60.0;
     double duration_seconds = 10.0;
     std::string output_file = "mandelbrot.mp4";
+    std::string kernel = "auto"; // auto, scalar, avx2, avx512, neon
 };
 
 // Parses command-line arguments into config.

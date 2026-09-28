@@ -43,6 +43,9 @@ public:
     void setView(double new_zoom, double new_offset_x, double new_offset_y);
     void set_schedule(Schedule schedule) { schedule_ = schedule; }
     [[nodiscard]] auto kernel_name() const -> const char*;
+    // Overrides the runtime-selected kernel. Returns false if the name is
+    // unknown or the CPU does not support it.
+    auto set_kernel(const char* name) -> bool;
 private:
     void render_tile(int row_index, int x_begin, int x_end);
 public:

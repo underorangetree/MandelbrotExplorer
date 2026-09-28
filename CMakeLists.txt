@@ -37,11 +37,15 @@ target_link_libraries(mandelbrot_core PUBLIC ${OpenCV_LIBS} Threads::Threads)
 # CPUs that lack the extension. select_kernel() dispatches at runtime.
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _mandelbrot_arch)
 if(_mandelbrot_arch MATCHES "x86_64|amd64|x64|i[3-6]86")
-    target_sources(mandelbrot_core PRIVATE src/MandelbrotKernel_avx2.cpp)
+    target_sources(mandelbrot_core PRIVATE
+        src/MandelbrotKernel_avx2.cpp
+        src/MandelbrotKernel_avx512.cpp)
     if(MSVC)
         set_source_files_properties(src/MandelbrotKernel_avx2.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
+        set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX512")
     else()
         set_source_files_properties(src/MandelbrotKernel_avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma")
+        set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mfma")
     endif()
 elseif((_mandelbrot_arch MATCHES "aarch64|arm64") AND NOT MSVC)
     target_sources(mandelbrot_core PRIVATE src/MandelbrotKernel_neon.cpp)

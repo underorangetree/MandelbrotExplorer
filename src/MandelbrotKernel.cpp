@@ -1,4 +1,5 @@
 #include "MandelbrotKernel.h"
+#include <string_view>
 
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
 #include <intrin.h>
@@ -7,6 +8,24 @@
 namespace {
 
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+auto cpu_supports_avx512() -> bool {
+    int regs[4] = {};
+    __cpuid(regs, 0);
+    if (regs[0] < 7) {
+        return false;
+    }
+    __cpuidex(regs, 1, 0);
+    if ((regs[2] & (1 << 27)) == 0) { // OSXSAVE
+        return false;
+    }
+    const unsigned long long xcr0 = _xgetbv(0);
+    if ((xcr0 & 0xE6ULL) != 0xE6ULL) { // SSE + AVX + opmask + ZMM_Hi256 + Hi16_ZMM state
+        return false;
+    }
+    __cpuidex(regs, 7, 0);
+    return (regs[1] & (1 << 16)) != 0; // EBX bit 16 = AVX-512F
+}
+
 auto cpu_supports_avx2_fma() -> bool {
     int regs[4] = {};
     __cpuid(regs, 0);
@@ -28,6 +47,11 @@ auto cpu_supports_avx2_fma() -> bool {
     return (regs[1] & (1 << 5)) != 0; // EBX bit 5 = AVX2
 }
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
+bool cpu_supports_avx512() {
+    __builtin_cpu_init();
+    return __builtin_cpu_supports("avx512f");
+}
+
 bool cpu_supports_avx2_fma() {
     __builtin_cpu_init();
     return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
@@ -38,6 +62,9 @@ bool cpu_supports_avx2_fma() {
 
 auto select_kernel() -> KernelSelection {
 #if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
+    if (cpu_supports_avx512()) {
+        return {.function=render_row_avx512, .name="avx512"};
+    }
     if (cpu_supports_avx2_fma()) {
         return {.function=render_row_avx2, .name="avx2"};
     }
@@ -47,4 +74,24 @@ auto select_kernel() -> KernelSelection {
 #else
     return {.function=render_row_scalar, .name="scalar"};
 #endif
+}
+
+auto find_kernel(const char* name) -> KernelSelection {
+    const std::string_view requested{name};
+    if (requested == "scalar") {
+        return {.function=render_row_scalar, .name="scalar"};
+    }
+#if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
+    if (requested == "avx2" && cpu_supports_avx2_fma()) {
+        return {.function=render_row_avx2, .name="avx2"};
+    }
+    if (requested == "avx512" && cpu_supports_avx512()) {
+        return {.function=render_row_avx512, .name="avx512"};
+    }
+#elif defined(__aarch64__)
+    if (requested == "neon") {
+        return {.function=render_row_neon, .name="neon"};
+    }
+#endif
+    return {.function=nullptr, .name=nullptr};
 }

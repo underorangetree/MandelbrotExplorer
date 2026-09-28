@@ -28,7 +28,7 @@ auto validate_max_iterations(int value) -> int {
 }
 
 auto padded_width(int value) -> int {
-    return (value + 7) & ~7; // pad to a multiple of 8 so any kernel fits
+    return (value + 31) & ~31; // pad to a multiple of 32 so the widest (AVX-512) kernel fits
 }
 
 } // namespace
@@ -124,4 +124,14 @@ auto Mandelbrot::generate() -> cv::Mat {
 
 auto Mandelbrot::kernel_name() const -> const char* {
     return kernel_name_;
+}
+
+auto Mandelbrot::set_kernel(const char* name) -> bool {
+    const KernelSelection selection = find_kernel(name);
+    if (selection.function == nullptr) {
+        return false;
+    }
+    kernel_ = selection.function;
+    kernel_name_ = selection.name;
+    return true;
 }
