@@ -38,6 +38,11 @@ cmake --build --preset macos-brew-release
 Other presets: `windows-msvc-ninja` (hardcodes `cl`; run it from a Visual Studio developer command prompt), `windows-mingw-gcc`, `windows-mingw-clang`.
 With the Visual Studio generator, `cmake --build` needs `--config Release` (or use the matching `*-release` build preset).
 
+RelWithDebInfo builds (optimized + symbols, e.g. for profiling) have their own presets: use
+`cmake --build --preset windows-msvc-vs2026-relwithdebinfo` for VS generators, or configure
+the matching `*-relwithdebinfo` configure preset first for Ninja/Linux/macOS
+(`cmake --preset linux-gcc-relwithdebinfo && cmake --build --preset linux-gcc-relwithdebinfo`).
+
 Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_render` is skipped (exit code 3) when no usable video backend is available; that is expected.
 
 ## Layout

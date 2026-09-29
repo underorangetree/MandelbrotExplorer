@@ -38,6 +38,14 @@
             }
         },
         {
+            "name": "windows-msvc-ninja-relwithdebinfo",
+            "displayName": "Windows: Ninja + MSVC (RelWithDebInfo)",
+            "inherits": "windows-msvc-ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
             "name": "windows-msvc-vs2022",
             "displayName": "Windows: Visual Studio 2022",
             "inherits": "base-vcpkg",
@@ -108,6 +116,14 @@
             }
         },
         {
+            "name": "linux-gcc-relwithdebinfo",
+            "displayName": "Linux: Ninja + GCC (system OpenCV, RelWithDebInfo)",
+            "inherits": "linux-gcc",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
             "name": "macos-brew",
             "displayName": "macOS: Ninja + Apple Clang (Homebrew OpenCV)",
             "inherits": "base-common",
@@ -120,6 +136,14 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "macos-brew-relwithdebinfo",
+            "displayName": "macOS: Ninja + Apple Clang (Homebrew OpenCV, RelWithDebInfo)",
+            "inherits": "macos-brew",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
         }
     ],
@@ -135,6 +159,23 @@
             "displayName": "Build Windows MSVC VS2026 Release",
             "configurePreset": "windows-msvc-vs2026",
             "configuration": "Release"
+        },
+        {
+            "name": "windows-msvc-vs2022-relwithdebinfo",
+            "displayName": "Build Windows MSVC VS2022 RelWithDebInfo",
+            "configurePreset": "windows-msvc-vs2022",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "windows-msvc-vs2026-relwithdebinfo",
+            "displayName": "Build Windows MSVC VS2026 RelWithDebInfo",
+            "configurePreset": "windows-msvc-vs2026",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "windows-msvc-ninja-relwithdebinfo",
+            "displayName": "Build Windows MSVC Ninja RelWithDebInfo",
+            "configurePreset": "windows-msvc-ninja-relwithdebinfo"
         },
         {
             "name": "windows-msvc-ninja-release",
@@ -157,9 +198,19 @@
             "configurePreset": "linux-gcc"
         },
         {
+            "name": "linux-gcc-relwithdebinfo",
+            "displayName": "Build Linux GCC RelWithDebInfo",
+            "configurePreset": "linux-gcc-relwithdebinfo"
+        },
+        {
             "name": "macos-brew-release",
             "displayName": "Build macOS Homebrew Release",
             "configurePreset": "macos-brew"
+        },
+        {
+            "name": "macos-brew-relwithdebinfo",
+            "displayName": "Build macOS Homebrew RelWithDebInfo",
+            "configurePreset": "macos-brew-relwithdebinfo"
         }
     ]
 }
