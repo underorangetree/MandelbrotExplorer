@@ -69,4 +69,5 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 
 ## Docs
 - `README.md` is user-facing; keep it in sync when CLI behavior changes.
+- `PERFORMANCE.md` - measured performance notes; lists experiments that were tried and rejected, do not redo them blindly.
 - `LICENSE` - MIT.
