@@ -91,6 +91,8 @@ Linux 上可先 `sudo apt install libopencv-dev`；Windows 上手动使用 vcpkg
 --duration <value>    时长，单位秒（默认 10）
 --threads <value>     渲染线程数，0 = 自动（默认 0）
 --kernel <name>       强制使用指定内核：auto|scalar|avx2|avx512|neon（默认 auto）
+--codec <name>        输出编码器：mp4v|h264|h265|vp9|av1|mjpg（默认 mp4v）
+--quality <value>     编码质量 0-100（默认 -1，即编码器默认值）
 ```
 
 示例：
@@ -99,7 +101,10 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 ```
 
 参数会被校验：宽/高 `[1, 32768]`、`--maxiter` `[1, 1000000]`、`--fps` `[0.001, 1000]`、
-`--duration` `[0.001, 86400]`、`--threads` `[0, 1024]`，且 `FPS × 时长 ≥ 1` 帧；非法输入会打印错误并退出。
+`--duration` `[0.001, 86400]`、`--threads` `[0, 1024]`、`--quality` `[0, 100]`，`--codec` 限
+`mp4v|h264|h265|vp9|av1|mjpg`，且 `FPS × 时长 ≥ 1` 帧；非法输入会打印错误并退出。
+编码器是否可用取决于 OpenCV 的构建（FFmpeg 后端）；打不开时会报错退出，
+`--quality` 不被某编码器支持时打印警告并继续。
 
 缩放动画曲线与目标中心点仍硬编码在 `main.cpp` 中。
 

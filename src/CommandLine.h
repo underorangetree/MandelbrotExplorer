@@ -13,6 +13,8 @@ struct RenderConfig {
     std::string output_file = "mandelbrot.mp4";
     std::string kernel = "auto"; // auto, scalar, avx2, avx512, neon
     int threads = 0;             // 0 = auto (hardware_concurrency)
+    std::string codec = "mp4v";  // mp4v, h264, h265, vp9, av1, mjpg
+    int quality = -1;            // 0..100, -1 = encoder default
 };
 
 // Parses command-line arguments into config.

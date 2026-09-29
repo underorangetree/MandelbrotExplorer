@@ -11,6 +11,7 @@
 #include <mutex>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 #include <opencv2/core.hpp>
@@ -81,6 +82,25 @@ static void sigint_handler(int) {
     sigint_flag = 1;
 }
 
+static auto codec_fourcc(const std::string& name) -> int {
+    if (name == "h264" || name == "avc1") {
+        return cv::VideoWriter::fourcc('a', 'v', 'c', '1');
+    }
+    if (name == "h265" || name == "hevc") {
+        return cv::VideoWriter::fourcc('h', 'e', 'v', '1');
+    }
+    if (name == "vp9") {
+        return cv::VideoWriter::fourcc('v', 'p', '0', '9');
+    }
+    if (name == "av1") {
+        return cv::VideoWriter::fourcc('a', 'v', '0', '1');
+    }
+    if (name == "mjpg") {
+        return cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
+    }
+    return cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+}
+
 static auto run(const RenderConfig& config, double progress_update_interval) -> int {
     std::signal(SIGINT, sigint_handler);
     Mandelbrot mandelbrot(config.width, config.height, config.max_iterations, config.threads);
@@ -88,13 +108,16 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
         std::cerr << "Requested kernel '" << config.kernel << "' is not available on this CPU/build.\n";
         return static_cast<int>(ExitStatus::InvalidArgument);
     }
-    auto fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+    const int fourcc = codec_fourcc(config.codec);
     cv::VideoWriter writer(config.output_file, fourcc, config.fps, cv::Size(config.width, config.height));
     if (!writer.isOpened()) {
-        std::cerr << "Could not open the output video file for write.\n";
+        std::cerr << "Could not open the output video file for write (codec: " << config.codec << ").\n";
         return static_cast<int>(ExitStatus::VideoWriterError);
     }
-    std::cout << std::format("Video will be saved to {}. Using {} threads. Kernel: {}.\n", config.output_file, mandelbrot.thread_count(), mandelbrot.kernel_name());
+    if (config.quality >= 0 && !writer.set(cv::VIDEOWRITER_PROP_QUALITY, static_cast<double>(config.quality))) {
+        std::cerr << "Warning: the " << config.codec << " encoder does not support --quality.\n";
+    }
+    std::cout << std::format("Video will be saved to {}. Using {} threads. Kernel: {}. Codec: {}.\n", config.output_file, mandelbrot.thread_count(), mandelbrot.kernel_name(), config.codec);
 
     // Render and encode form a producer/consumer pipeline: the main thread
     // renders frame N+1 into a free buffer while the writer thread encodes frame

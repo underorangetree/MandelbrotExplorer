@@ -118,11 +118,15 @@ void test_kernel_selection() {
 void test_command_line_success() {
     RenderConfig config;
     CHECK(config.kernel == "auto"); // default
-    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar", "--threads", "3"};
+    CHECK(config.codec == "mp4v");
+    CHECK(config.quality == -1);
+    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar", "--threads", "3", "--codec", "h264", "--quality", "80"};
     auto result = parse(args, config);
     CHECK(!result.has_value());
     CHECK(config.kernel == "scalar");
     CHECK(config.threads == 3);
+    CHECK(config.codec == "h264");
+    CHECK(config.quality == 80);
     CHECK(config.width == 100);
     CHECK(config.height == 50);
     CHECK(config.max_iterations == 10);
@@ -167,7 +171,11 @@ void test_command_line_errors() {
         {"prog", "--kernel", "bogus"},
         {"prog", "--threads", "-1"},
         {"prog", "--threads", "abc"},
-        {"prog", "--threads", "1025"}
+        {"prog", "--threads", "1025"},
+        {"prog", "--codec", "bogus"},
+        {"prog", "--quality", "101"},
+        {"prog", "--quality", "-1"},
+        {"prog", "--quality", "abc"}
     };
     for (const auto& args : invalid) {
         RenderConfig config;
@@ -186,7 +194,11 @@ void test_command_line_boundaries_accepted() {
         {"prog", "--height", "32768"},
         {"prog", "--kernel", "auto"},
         {"prog", "--threads", "0"},
-        {"prog", "--threads", "1024"}
+        {"prog", "--threads", "1024"},
+        {"prog", "--codec", "mp4v"},
+        {"prog", "--codec", "mjpg"},
+        {"prog", "--quality", "0"},
+        {"prog", "--quality", "100"}
     };
     for (const auto& args : valid) {
         RenderConfig config;

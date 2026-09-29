@@ -15,6 +15,8 @@ constexpr int min_max_iter = mandelbrot::min_iteration_count;
 constexpr int max_max_iter = mandelbrot::max_iteration_count;
 constexpr int min_threads = 0; // 0 = auto
 constexpr int max_threads = mandelbrot::max_thread_count;
+constexpr int min_quality = 0;
+constexpr int max_quality = 100;
 constexpr double min_fps = 0.001;
 constexpr double max_fps = 1000.0;
 constexpr double min_duration = 0.001;
@@ -31,7 +33,9 @@ const std::unordered_map<std::string, int> subcommand_index = {
     {"--fps", 5},
     {"--duration", 6},
     {"--kernel", 7},
-    {"--threads", 8}
+    {"--threads", 8},
+    {"--codec", 9},
+    {"--quality", 10}
 };
 
 auto parse_int(const std::string& value, const std::string& arg, int min_value, int max_value) -> std::optional<int> {
@@ -81,7 +85,9 @@ void print_usage(const char* program) {
               << "  --fps <value>          Set frames per second (default: " << defaults.fps << ")\n"
               << "  --duration <value>     Set duration in seconds (default: " << defaults.duration_seconds << ")\n"
               << "  --threads <value>      Set render thread count, 0 = auto (default: " << default_threads << ")\n"
-              << "  --kernel <name>        Force a kernel: auto|scalar|avx2|avx512|neon (default: " << defaults.kernel << ")\n";
+              << "  --kernel <name>        Force a kernel: auto|scalar|avx2|avx512|neon (default: " << defaults.kernel << ")\n"
+              << "  --codec <name>         Set video codec: mp4v|h264|h265|vp9|av1|mjpg (default: " << defaults.codec << ")\n"
+              << "  --quality <value>      Set encoder quality 0-100 (default: " << defaults.quality << ", encoder default)\n";
 }
 
 } // namespace
@@ -176,6 +182,23 @@ auto parse_command_line(std::span<char* const> args, RenderConfig& config) -> st
                         return ExitStatus::InvalidArgument;
                     }
                     config.threads = *parsed;
+                    break;
+                }
+                case 9:
+                    if (value != "mp4v" && value != "h264" && value != "avc1" && value != "h265" &&
+                        value != "hevc" && value != "vp9" && value != "av1" && value != "mjpg") {
+                        std::cerr << "Unknown codec for " << arg << ": " << value
+                                  << " (expected mp4v, h264, h265, vp9, av1, or mjpg)\n";
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.codec = value;
+                    break;
+                case 10: {
+                    auto parsed = parse_int(value, arg, min_quality, max_quality);
+                    if (!parsed) {
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.quality = *parsed;
                     break;
                 }
                 default:
