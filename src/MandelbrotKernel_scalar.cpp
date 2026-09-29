@@ -1,3 +1,4 @@
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include "MandelbrotKernel.h"

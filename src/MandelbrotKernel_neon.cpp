@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <arm_neon.h>
 #include "MandelbrotKernel.h"

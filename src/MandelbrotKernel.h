@@ -27,9 +27,12 @@ struct KernelSelection {
 };
 
 void render_row_scalar(const RowContext& context);
+#if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
 void render_row_avx2(const RowContext& context);
 void render_row_avx512(const RowContext& context);
+#elif defined(__aarch64__)
 void render_row_neon(const RowContext& context);
+#endif
 
 // Picks the best kernel available for the CPU executing this process.
 [[nodiscard]] auto select_kernel() -> KernelSelection;

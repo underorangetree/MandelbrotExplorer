@@ -1,8 +1,10 @@
 #include "CommandLine.h"
 #include "MandelbrotLimits.h"
 #include <cmath>
+#include <cstddef>
 #include <exception>
 #include <iostream>
+#include <string>
 #include <unordered_map>
 
 namespace {

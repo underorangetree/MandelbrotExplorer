@@ -1,7 +1,8 @@
 #pragma once
 
-// Shared numeric limits for image dimensions and iteration counts, used by both
-// the command-line parser and the Mandelbrot class so the two cannot drift.
+// Shared numeric limits for image dimensions, iteration counts, and thread
+// counts, used by both the command-line parser and the Mandelbrot class so the
+// two cannot drift.
 namespace mandelbrot {
 
 inline constexpr int min_dimension = 1;
