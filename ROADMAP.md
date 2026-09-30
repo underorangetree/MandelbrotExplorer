@@ -1,0 +1,66 @@
+# MandelbrotExplorer 路线图
+
+本文档列出通往 1.0 的发布计划，优先级大致为：发布准备 -> API 冻结 -> 功能收口 -> 分发与 CI。
+
+## 当前状态
+
+- `v0.5.0` 是最后一个正式发布（仅 CLI 视频生成）。
+- `main` 上自 `v0.5.0` 起积累了一批待发布的提交：C ABI 共享库（`mandelbrot_explorer`）、
+  视频 API（`mandelbrot_explorer_video`）、Python 绑定、AVX-512/AVX2 内核与流水线性能改造、
+  `--threads/--codec/--quality` 等；行覆盖率 92%（gcovr，Linux x64），双端 ctest 全部通过。
+- CI 覆盖 Linux x64 与 ARM64（gcc/clang）及 Windows MSVC；macOS 有 CMake preset 但无 CI。
+
+## 0.6.0 - 发布准备
+
+- [ ] 推送 `main` 上待发布的提交并确认 CI 通过
+- [ ] `CMakeLists.txt` 中 `project(... VERSION 0.6.0)`（单一来源：`mb_version()`、Python `version()`、
+      CLI `--version` 自动跟随）
+- [ ] 发布说明（GitHub Release 描述或 `CHANGELOG.md`）：新库、改名（库名/头路径/环境变量）、
+      性能改造，并注明 0.x 期间 C ABI 仍可能变动
+- [ ] README 修正：`共享库 mandelbrot` -> `mandelbrot_explorer`；动画曲线位置改为 `src/ViewSequence.h`
+- [x] CLI `-v/--version`
+
+## 0.7 - 0.9 - 1.0 前置
+
+### API 冻结
+
+- [ ] 在 README 写明三大公开面（CLI、C ABI、Python 包）与其 SemVer 承诺
+- [ ] C ABI 稳定性规则：`SOVERSION` 的升级条件、`struct_size` 加性演进、弃用流程
+- [ ] 文档化进程退出码（`ExitStatus`）与库状态码（`mb_status`）
+
+### 功能收口
+
+- [ ] 自定义视角：中心点、起始缩放与动画参数在 CLI、C ABI、Python 三个面同步暴露
+- [ ] （可选）2x 帧复用性能优化（原型已验证 20-30% 加速且逐位一致）
+
+### 分发与打包
+
+- [ ] CMake 包配置：`install(EXPORT)` + `MandelbrotExplorerConfig.cmake`，支持 `find_package`
+- [ ] 应用本体的 install 规则；Windows 运行期 OpenCV DLL 的处理说明
+- [ ] Python：`pyproject.toml` + 各平台 wheel（捆绑 `.dll/.so/.dylib`）
+- [ ] （可选）CPack 压缩包、vcpkg 端口
+
+### CI 与质量
+
+- [ ] macOS CI job
+- [ ] CI 安装 numpy，让 `python_binding` 真正执行而不是被 skip
+- [ ] ASan/UBSan 构建 job
+- [ ] tag 触发的发布自动化
+- [ ] 覆盖率门槛（行 >= 90%）
+
+### 文档
+
+- [ ] `CHANGELOG.md`
+- [ ] README 平台支持矩阵与已知限制
+- [ ] （可选）`docs/` 下的 C ABI 使用教程
+
+## 1.0 完成标准
+
+- 以上全部完成；
+- 公开面（CLI/C ABI/Python）在 0.8 -> 1.0 之间无破坏性变更，即冻结满一个 minor 周期；
+- 至少经历 0.6/0.7 两轮发布并收集到库与 Python 用户反馈。
+
+## 非目标（1.0 前不考虑）
+
+- GUI 界面
+- 自定义分形公式（Mandelbrot 之外）

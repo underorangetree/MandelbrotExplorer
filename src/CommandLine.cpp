@@ -7,6 +7,10 @@
 #include <string>
 #include <unordered_map>
 
+#ifndef MANDELBROT_EXPLORER_VERSION
+#define MANDELBROT_EXPLORER_VERSION "unknown"
+#endif
+
 namespace {
 
 constexpr int min_dimension = mandelbrot::min_dimension;
@@ -70,6 +74,10 @@ auto parse_double(const std::string& value, const std::string& arg, double min_v
     return parsed;
 }
 
+void print_version() {
+    std::cout << "MandelbrotExplorer " << MANDELBROT_EXPLORER_VERSION << "\n";
+}
+
 void print_usage(const char* program) {
     // Read the defaults from RenderConfig itself so this text cannot drift.
     const RenderConfig defaults;
@@ -77,6 +85,7 @@ void print_usage(const char* program) {
     std::cout << "Usage: " << program << " [options]\n"
               << "Options:\n"
               << "  -h, --help             Show this help message and exit\n"
+              << "  -v, --version          Show the version and exit\n"
               << "  -o, --output <file>    Set output video file name (default: " << defaults.output_file << ")\n"
               << "  -s, --size <WxH>       Set video size (default: " << defaults.width << 'x' << defaults.height << ")\n"
               << "  --width <value>        Set video width (default: " << defaults.width << ")\n"
@@ -208,6 +217,9 @@ auto parse_command_line(std::span<char* const> args, RenderConfig& config) -> st
         }
         else if (arg == "-h" || arg == "--help") {
             print_usage(args.empty() ? "MandelbrotExplorer" : args[0]);
+            return ExitStatus::Success;
+        } else if (arg == "-v" || arg == "--version") {
+            print_version();
             return ExitStatus::Success;
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";

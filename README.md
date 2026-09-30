@@ -82,6 +82,7 @@ Linux 上可先 `sudo apt install libopencv-dev`；Windows 上手动使用 vcpkg
 ### 命令行参数
 ```
 -h, --help            显示帮助并退出
+-v, --version         显示版本并退出
 -o, --output <file>   输出文件名（默认 mandelbrot.mp4）
 -s, --size <WxH>      视频尺寸 WxH（默认 1920x1080）
 --width <value>       视频宽度（默认 1920）

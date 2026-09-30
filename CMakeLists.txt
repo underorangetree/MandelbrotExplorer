@@ -30,6 +30,8 @@ add_library(mandelbrot_explorer_core STATIC
     src/ThreadPool.h
 )
 target_include_directories(mandelbrot_explorer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# The CLI prints this for --version; single-sourced from PROJECT_VERSION.
+target_compile_definitions(mandelbrot_explorer_core PRIVATE MANDELBROT_EXPLORER_VERSION="${PROJECT_VERSION}")
 # The renderer core is OpenCV-free; only the app and the tests use OpenCV.
 target_link_libraries(mandelbrot_explorer_core PUBLIC Threads::Threads)
 # The core is linked into the shared C ABI library, so it must be position independent.
@@ -157,6 +159,7 @@ if(BUILD_TESTING)
     endif()
 
     add_test(NAME cli_help COMMAND ${PROJECT_NAME} --help)
+    add_test(NAME cli_version COMMAND ${PROJECT_NAME} --version)
 
     add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
     set_tests_properties(cli_invalid_size PROPERTIES WILL_FAIL TRUE)

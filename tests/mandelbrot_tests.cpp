@@ -145,6 +145,17 @@ void test_command_line_help() {
     CHECK(result.has_value() && *result == ExitStatus::Success);
 }
 
+void test_command_line_version() {
+    RenderConfig config;
+    std::vector<std::string> args = {"prog", "-v"};
+    auto result = parse(args, config);
+    CHECK(result.has_value() && *result == ExitStatus::Success);
+
+    args = {"prog", "--version"};
+    result = parse(args, config);
+    CHECK(result.has_value() && *result == ExitStatus::Success);
+}
+
 void test_command_line_errors() {
     const std::vector<std::vector<std::string>> invalid = {
         {"prog", "--size", "0x0"},
@@ -601,6 +612,7 @@ auto main() -> int {
     test_kernel_selection();
     test_command_line_success();
     test_command_line_help();
+    test_command_line_version();
     test_command_line_errors();
     test_command_line_boundaries_accepted();
     test_kernel_matches_scalar();
