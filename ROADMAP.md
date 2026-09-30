@@ -13,11 +13,10 @@
 ## 0.6.0 - 发布准备
 
 - [ ] 推送 `main` 上待发布的提交并确认 CI 通过
-- [ ] 版本号升到 0.6.0：`CMakeLists.txt` 的 `project(... VERSION ...)` 与
+- [x] 版本号升到 0.6.0：`CMakeLists.txt` 的 `project(... VERSION ...)` 与
       `bindings/python/mandelbrot_explorer/__init__.py` 的 `__version__`（selftest 会校验二者一致，
       `mb_version()`、Python `version()`、CLI `--version` 跟随 CMake 版本）
-- [ ] 发布说明（GitHub Release 描述或 `CHANGELOG.md`）：新库、改名（库名/头路径/环境变量）、
-      性能改造，并注明 0.x 期间 C ABI 仍可能变动
+- [x] 发布说明：`CHANGELOG.md` 的 0.6.0 条目（新库、性能改造，并注明 0.x 期间 C ABI 仍可能变动）
 - [x] README 修正：`共享库 mandelbrot` -> `mandelbrot_explorer`；动画曲线位置改为 `src/ViewSequence.h`
 - [x] CLI `-v/--version`
 

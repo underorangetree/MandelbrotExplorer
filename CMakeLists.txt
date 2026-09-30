@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 cmake_policy(SET CMP0074 NEW)
-project(MandelbrotExplorer VERSION 0.5.0
+project(MandelbrotExplorer VERSION 0.6.0
         DESCRIPTION "A Mandelbrot set explorer using OpenCV"
         LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

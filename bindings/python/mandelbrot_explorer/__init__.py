@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover - exercised on minimal installs
 
 # Kept in sync with the CMake project version; the self-test verifies that it
 # matches the version reported by the loaded shared library.
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "Mandelbrot",
@@ -294,7 +294,7 @@ def _image_format_value(name: str) -> int:
 
 
 def version() -> str:
-    """Version of the loaded shared library, e.g. ``"0.5.0"``."""
+    """Version of the loaded shared library, e.g. ``"0.6.0"``."""
     return _lib().mb_version().decode()
 
 

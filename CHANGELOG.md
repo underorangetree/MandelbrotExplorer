@@ -3,7 +3,13 @@
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)；变更记录格式参考
 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]（计划为 0.6.0）
+## [Unreleased]
+
+## [0.6.0] - 2026-09-30
+
+首个包含 C ABI 共享库的版本：库、CMake 目标、头文件路径与环境变量均以项目名命名
+（`mandelbrot_explorer` / `mandelbrot_explorer_video`），导出的 C 符号为 `mb_*`。
+0.x 期间 C ABI 仍可能变动，破坏性变更会记录在本文件并体现在 `SOVERSION` 上。
 
 ### 新增
 
@@ -35,8 +41,6 @@
 
 ### 变更
 
-- 库、CMake 目标、头文件路径与环境变量统一改名为 `mandelbrot_explorer` /
-  `mandelbrot_explorer_video`；C 导出符号（`mb_*`）与导出宏不变。
 - 渲染与编码改为“帧缓冲池 + 写出线程”的生产-消费流水线，编码与渲染重叠执行。
 - AVX2 内核重写：携带平方量、去掉累计掩码，避免寄存器溢出到栈。
 - AVX-512 内核重写为双链结构。
@@ -62,5 +66,6 @@
   黑体辐射颜色映射，MP4 导出与平滑缩放动画。
 - 参数校验与 `--help`；macOS（Homebrew）构建支持。
 
-[Unreleased]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/UnderOrangeTree/MandelbrotExplorer/releases/tag/v0.5.0
