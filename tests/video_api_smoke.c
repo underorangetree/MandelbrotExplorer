@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include "mandelbrot_explorer/mandelbrot_explorer.h"
@@ -106,6 +107,48 @@ int main(void) {
     remove("video_api_smoke.mp4");
     if (size <= 0) {
         return 1;
+    }
+
+    /* Custom view: the appended fields are read when struct_size covers the
+     * whole struct (these run after the backend check, so a missing encoder
+     * still only skips the test). */
+    {
+        mb_video_params custom = params;
+        custom.center_x = -0.5;
+        custom.center_y = 0.0;
+        custom.start_zoom = 1.0;
+        custom.end_zoom = 2.0;
+        if (mb_write_video(&custom, "video_api_smoke_view.mp4") != MB_OK) {
+            return 1;
+        }
+        remove("video_api_smoke_view.mp4");
+
+        /* start_zoom == end_zoom renders a static view. */
+        custom.start_zoom = 1.5;
+        custom.end_zoom = 1.5;
+        if (mb_write_video(&custom, "video_api_smoke_static.mp4") != MB_OK) {
+            return 1;
+        }
+        remove("video_api_smoke_static.mp4");
+    }
+
+    /* A struct sized like the original 0.6.0 layout keeps every default. */
+    {
+        mb_video_params old;
+        memset(&old, 0, sizeof(old));
+        old.struct_size = offsetof(mb_video_params, center_x);
+        old.width = 160;
+        old.height = 120;
+        old.max_iterations = 8;
+        old.threads = 1;
+        old.fps = 2.0;
+        old.duration_seconds = 1.0;
+        old.kernel = "scalar";
+        old.pixel_order = MB_BGR;
+        if (mb_write_video(&old, "video_api_smoke_old.mp4") != MB_OK) {
+            return 1;
+        }
+        remove("video_api_smoke_old.mp4");
     }
 
     /* RGB output with the encoder-default quality. */

@@ -53,7 +53,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `include/mandelbrot_explorer/mandelbrot_explorer.h` + `src/MandelbrotC.cpp` - C ABI (`mb_*`) shared library target `mandelbrot_explorer` for FFI callers (Python ctypes, P/Invoke, ...): contexts plus a one-shot `mb_render_frame` parameter API, color (BGR/RGB) and int32 iteration outputs, dependency-free BMP/PNM image writing, cancellation. Handles are opaque, errors are status codes, exceptions never cross the boundary.
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
 - `include/mandelbrot_explorer/video.h` + `src/MandelbrotVideoC.cpp` - OpenCV-based video export shared library `mandelbrot_explorer_video` (`mb_write_video` with the app's animation); the core `mandelbrot` library stays dependency-free.
-- `src/ViewSequence.h` / `src/VideoCodec.h` - shared zoom animation curve and codec name -> fourcc mapping used by the app, the benchmark and the video API.
+- `src/ViewSequence.h` / `src/VideoCodec.h` - parameterized zoom animation (`ZoomAnimation`: center + start/end zoom, cubic ease, per-frame base derived from the frame count) and codec name -> fourcc mapping used by the app, the benchmark and the video API.
 - `cmake/MandelbrotExplorerConfig.cmake.in` - package config template; the install exports `MandelbrotExplorer::mandelbrot_explorer` and (with video) `MandelbrotExplorer::mandelbrot_explorer_video` for `find_package`.
 - `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found); `pyproject.toml`, `stage_libraries.py` and `retag_wheel.py` bundle the native library into platform-tagged wheels; `manylinux_build.sh` builds the Linux wheel inside the manylinux image and `check_version.py` guards releases against version mismatches.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
@@ -77,6 +77,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - Signals: `sigint_flag` is `volatile std::sig_atomic_t`; the handler must not perform I/O.
 - Python packaging: the version in `bindings/python/mandelbrot_explorer/__init__.py` (`__version__`) must match `PROJECT_VERSION`; `selftest.py` verifies it against the loaded library, and wheel jobs stage the native library with `bindings/python/stage_libraries.py`.
 - Windows installs: the `base-vcpkg` preset sets `X_VCPKG_APPLOCAL_DEPS_INSTALL=ON`, so `cmake --install` copies the OpenCV runtime and its third-party DLLs next to the executable.
+- `mb_video_params` appends the custom-view fields after the 0.6.0 layout: read them only when `struct_size >= sizeof(mb_video_params)`, and treat `start_zoom <= 0` (default 0.8) / `end_zoom <= 0` (default depth) as "use the default". Keep this rule when appending future fields.
 
 ## CI
 - `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest), plus ASan/UBSan and coverage (gcovr, line gate) jobs.

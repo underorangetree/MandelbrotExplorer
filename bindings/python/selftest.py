@@ -98,9 +98,13 @@ def main() -> int:
     # Video export uses the optional mandelbrot_explorer_video library.
     with tempfile.TemporaryDirectory() as directory:
         clip = Path(directory) / "clip.mp4"
+        still = Path(directory) / "still.mp4"
         try:
             me.write_video(clip, 160, 120, max_iterations=32, threads=2,
-                                   fps=5.0, duration=1.0, kernel="scalar")
+                                   fps=5.0, duration=1.0, kernel="scalar",
+                                   center=(-0.5, 0.0), start_zoom=1.0, end_zoom=2.0)
+            me.write_video(still, 64, 64, max_iterations=16, threads=1,
+                                   fps=1.0, duration=1.0, start_zoom=1.5, end_zoom=1.5)
         except FileNotFoundError as error:
             print("mandelbrot_explorer_video not available:", error)
             return 3
@@ -108,6 +112,7 @@ def main() -> int:
             print("no usable video backend:", error)
             return 3
         check(clip.exists() and clip.stat().st_size > 0, "video file was written")
+        check(still.exists() and still.stat().st_size > 0, "static view video was written")
 
     try:
         me.Mandelbrot(0, 0, 0)

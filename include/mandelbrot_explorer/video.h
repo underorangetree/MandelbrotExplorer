@@ -26,8 +26,10 @@ extern "C" {
 #endif
 
 /* One-shot video export parameters. Set struct_size to sizeof(mb_video_params)
- * so future fields can be added safely. The animation and the accepted codec
- * names match the command line application. */
+ * so future fields can be added safely: callers compiled against an older
+ * header may pass a smaller struct_size, and the fields their struct does not
+ * cover fall back to the defaults (the command line application's animation).
+ * The accepted codec names also match the application. */
 typedef struct mb_video_params {
     size_t struct_size;
     int width;
@@ -40,6 +42,15 @@ typedef struct mb_video_params {
     mb_pixel_order pixel_order;
     const char* codec;         /* NULL = "mp4v" (mp4v|h264|h265|vp9|av1|mjpg) */
     int quality;               /* 0..100, -1 = encoder default */
+    /* Custom view (appended in 0.7.0; defaults reproduce the application's
+     * animation). All four fields are read only when struct_size covers the
+     * whole struct, so older callers keep the defaults. */
+    double center_x;           /* animation center, finite */
+    double center_y;
+    double start_zoom;         /* zoom of the first frame; <= 0 = default (0.8) */
+    double end_zoom;           /* zoom of the last frame; <= 0 keeps the default
+                                * depth factor (start_zoom * 1.05^280).
+                                * start_zoom == end_zoom renders a static view */
 } mb_video_params;
 
 /* Renders the animation and writes it to `path`. Returns MB_VIDEO_ERROR when

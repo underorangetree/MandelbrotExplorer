@@ -178,8 +178,8 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
                 index = free_indices.front();
                 free_indices.pop_front();
             }
-            zoom = mandelbrot::animation_zoom(frame, total_frames);
-            mandelbrot.setView(zoom, mandelbrot::animation_center_x, mandelbrot::animation_center_y);
+            zoom = mandelbrot::animation_zoom(frame, total_frames, config.animation);
+            mandelbrot.setView(zoom, config.animation.center_x, config.animation.center_y);
             TimePoint start = std::chrono::steady_clock::now();
             mandelbrot.generate_into(frame_buffers[static_cast<std::size_t>(index)].storage.data,
                                      frame_buffers[static_cast<std::size_t>(index)].storage.step);

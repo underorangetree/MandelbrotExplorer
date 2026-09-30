@@ -68,6 +68,12 @@ _STATUS_NAMES = {
 _PIXEL_ORDERS = {"bgr": 0, "rgb": 1}
 _IMAGE_FORMATS = {"bmp": 0, "pnm": 1, "ppm": 1}
 
+# Mirrors the animation defaults in src/ViewSequence.h; the binding fills the
+# optional view fields of mb_video_params explicitly so unset parameters keep
+# the same values as the C library.
+_ANIMATION_CENTER = (-0.743643887037158704752191506114774, 0.131825904205311970493132056385139)
+_ANIMATION_START_ZOOM = 0.8
+
 _CORE_LIBRARY_NAMES = ("mandelbrot_explorer.dll", "libmandelbrot_explorer.so", "libmandelbrot_explorer.dylib")
 _CORE_PATTERNS = ("build/*/Release/mandelbrot_explorer.dll", "build/*/mandelbrot_explorer.dll",
                   "build/*/libmandelbrot_explorer.so*", "build/libmandelbrot_explorer.so*",
@@ -217,6 +223,10 @@ class _VideoParams(ctypes.Structure):
         ("pixel_order", c_int),
         ("codec", c_char_p),
         ("quality", c_int),
+        ("center_x", c_double),
+        ("center_y", c_double),
+        ("start_zoom", c_double),
+        ("end_zoom", c_double),
     ]
 
 
@@ -498,15 +508,20 @@ def write_video(path: str, width: int = 1920, height: int = 1080, *, max_iterati
                 threads: int = 0, fps: float = 60.0, duration: float = 10.0,
                 kernel: str | None = None, pixel_order: str = "bgr",
                 codec: str | None = None, quality: int = -1,
+                center: tuple[float, float] | None = None,
+                start_zoom: float | None = None, end_zoom: float | None = None,
                 library: str | None = None) -> None:
-    """Renders the application's zoom animation and writes it to ``path``.
+    """Renders the zoom animation and writes it to ``path``.
 
-    Needs the optional OpenCV-based ``mandelbrot_explorer_video`` library. Raises
-    :class:`VideoError` when no usable encoder is available, and
+    ``center``, ``start_zoom`` and ``end_zoom`` customize the view; the defaults
+    reproduce the application's animation, and ``start_zoom == end_zoom`` renders
+    a static view. Needs the optional OpenCV-based ``mandelbrot_explorer_video``
+    library. Raises :class:`VideoError` when no usable encoder is available, and
     :class:`FileNotFoundError` when the library itself is not built.
     """
     if library is not None:
         load_video_library(library)
+    view_center = center if center is not None else _ANIMATION_CENTER
     params = _VideoParams()
     params.struct_size = ctypes.sizeof(_VideoParams)
     params.width = width
@@ -519,4 +534,8 @@ def write_video(path: str, width: int = 1920, height: int = 1080, *, max_iterati
     params.pixel_order = _pixel_order_value(pixel_order)
     params.codec = codec.encode() if codec else None
     params.quality = quality
+    params.center_x = float(view_center[0])
+    params.center_y = float(view_center[1])
+    params.start_zoom = float(start_zoom) if start_zoom is not None else _ANIMATION_START_ZOOM
+    params.end_zoom = float(end_zoom) if end_zoom is not None else 0.0
     _check_video(_lib_video().mb_write_video(ctypes.byref(params), str(path).encode()))

@@ -123,7 +123,7 @@ void test_command_line_success() {
     CHECK(config.kernel == "auto"); // default
     CHECK(config.codec == "mp4v");
     CHECK(config.quality == -1);
-    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar", "--threads", "3", "--codec", "h264", "--quality", "80"};
+    std::vector<std::string> args = {"prog", "--size", "100x50", "--maxiter", "10", "--fps", "2", "--duration", "3", "-o", "out.mp4", "--kernel", "scalar", "--threads", "3", "--codec", "h264", "--quality", "80", "--center", "-0.5,0.5", "--start-zoom", "2", "--end-zoom", "1024"};
     auto result = parse(args, config);
     CHECK(!result.has_value());
     CHECK(config.kernel == "scalar");
@@ -136,6 +136,10 @@ void test_command_line_success() {
     CHECK(config.fps == 2.0);
     CHECK(config.duration_seconds == 3.0);
     CHECK(config.output_file == "out.mp4");
+    CHECK(config.animation.center_x == -0.5);
+    CHECK(config.animation.center_y == 0.5);
+    CHECK(config.animation.start_zoom == 2.0);
+    CHECK(config.animation.end_zoom == 1024.0);
 }
 
 void test_command_line_help() {
@@ -190,6 +194,20 @@ void test_command_line_errors() {
         {"prog", "--threads", "-1"},
         {"prog", "--threads", "abc"},
         {"prog", "--threads", "1025"},
+        {"prog", "--center", "1"},
+        {"prog", "--center", ",0.5"},
+        {"prog", "--center", "0.5,"},
+        {"prog", "--center", "0.5,0.5,0.5"},
+        {"prog", "--center", "a,b"},
+        {"prog", "--center", "11,0"},
+        {"prog", "--center", "0,-11"},
+        {"prog", "--start-zoom", "0"},
+        {"prog", "--start-zoom", "-1"},
+        {"prog", "--start-zoom", "abc"},
+        {"prog", "--start-zoom", "1e13"},
+        {"prog", "--end-zoom", "0"},
+        {"prog", "--end-zoom", "nan"},
+        {"prog", "--end-zoom", "1e13"},
         {"prog", "--codec", "bogus"},
         {"prog", "--quality", "101"},
         {"prog", "--quality", "-1"},
@@ -216,7 +234,13 @@ void test_command_line_boundaries_accepted() {
         {"prog", "--codec", "mp4v"},
         {"prog", "--codec", "mjpg"},
         {"prog", "--quality", "0"},
-        {"prog", "--quality", "100"}
+        {"prog", "--quality", "100"},
+        {"prog", "--center", "-10,-10"},
+        {"prog", "--center", "10,10"},
+        {"prog", "--start-zoom", "1e-12"},
+        {"prog", "--start-zoom", "1e12"},
+        {"prog", "--end-zoom", "1e-12"},
+        {"prog", "--end-zoom", "1e12"}
     };
     for (const auto& args : valid) {
         RenderConfig config;
@@ -224,6 +248,45 @@ void test_command_line_boundaries_accepted() {
         auto result = parse(mutable_args, config);
         CHECK(!result.has_value());
     }
+}
+
+// The zoom animation interpolates exponentially between start and end zoom
+// with a cubic ease: the first frame is start_zoom, the last frame is exactly
+// end_zoom (or the historical depth factor when end_zoom is not set), and
+// single-frame sequences stay at start_zoom.
+void test_zoom_animation() {
+    const auto close = [](double a, double b, double tolerance) {
+        return std::abs(a - b) <= tolerance * std::max(1.0, std::abs(b));
+    };
+
+    const mandelbrot::ZoomAnimation custom{.center_x=0.25, .center_y=-0.5,
+                                           .start_zoom=1.0, .end_zoom=100.0};
+    CHECK(mandelbrot::animation_zoom(0, 60, custom) == 1.0);
+    CHECK(close(mandelbrot::animation_zoom(59, 60, custom), 100.0, 1e-9));
+
+    double previous = mandelbrot::animation_zoom(0, 60, custom);
+    for (int frame = 1; frame < 60; ++frame) {
+        const double zoom = mandelbrot::animation_zoom(frame, 60, custom);
+        CHECK(zoom > previous);
+        previous = zoom;
+    }
+
+    // start_zoom == end_zoom renders a static view.
+    const mandelbrot::ZoomAnimation static_view{.start_zoom=3.0, .end_zoom=3.0};
+    CHECK(mandelbrot::animation_zoom(0, 10, static_view) == 3.0);
+    CHECK(mandelbrot::animation_zoom(9, 10, static_view) == 3.0);
+
+    // Zooming out is supported.
+    const mandelbrot::ZoomAnimation zoom_out{.start_zoom=10.0, .end_zoom=1.0};
+    CHECK(close(mandelbrot::animation_zoom(99, 100, zoom_out), 1.0, 1e-9));
+
+    // A single frame stays at start_zoom, and an unset end_zoom keeps the
+    // historical depth factor.
+    CHECK(mandelbrot::animation_zoom(0, 1, custom) == 1.0);
+    const mandelbrot::ZoomAnimation defaults;
+    CHECK(mandelbrot::animation_zoom(0, 100, defaults) == defaults.start_zoom);
+    CHECK(close(mandelbrot::animation_zoom(999, 1000, defaults),
+                mandelbrot::default_end_zoom(defaults.start_zoom), 1e-9));
 }
 
 struct AlignedDelete {
@@ -615,6 +678,7 @@ auto main() -> int {
     test_command_line_version();
     test_command_line_errors();
     test_command_line_boundaries_accepted();
+    test_zoom_animation();
     test_kernel_matches_scalar();
     test_forced_kernel_rendering();
     test_generate_into();

@@ -3,6 +3,7 @@
 #include <span>
 #include <string>
 #include "ExitStatus.h"
+#include "ViewSequence.h"
 
 struct RenderConfig {
     int width = 1920;
@@ -15,6 +16,7 @@ struct RenderConfig {
     int threads = 0;             // 0 = auto (hardware_concurrency)
     std::string codec = "mp4v";  // mp4v, h264, h265, vp9, av1, mjpg
     int quality = -1;            // 0..100, -1 = encoder default
+    mandelbrot::ZoomAnimation animation; // defaults reproduce the original animation
 };
 
 // Parses command-line arguments into config.

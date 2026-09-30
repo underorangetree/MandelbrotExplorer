@@ -203,6 +203,11 @@ int main(void) {
     vp.pixel_order = MB_BGR;
     vp.codec = "h264";           /* NULL 或空串 = "mp4v" */
     vp.quality = -1;             /* < 0 = 编码器默认 */
+    /* 可选的自定义视角（0.7.0 追加；全 0 即默认动画） */
+    vp.center_x = -0.743643887037158704752191506114774;
+    vp.center_y = 0.131825904205311970493132056385139;
+    vp.start_zoom = 0.8;         /* <= 0 = 默认 0.8 */
+    vp.end_zoom = 0;             /* <= 0 = 默认推进倍率；等于 start_zoom 即静态视角 */
 
     const mb_status status = mb_write_video(&vp, "zoom.mp4");
     if (status == MB_VIDEO_ERROR) {
@@ -219,8 +224,11 @@ int main(void) {
 
 要点：
 
-- 动画曲线与 CLI 完全一致（共用 `src/ViewSequence.h`），编码器名称集合也一致
-  （`mp4v|h264|avc1|h265|hevc|vp9|av1|mjpg`，见 `src/VideoCodec.h`）；
+- 动画曲线与 CLI 完全一致（共用 `src/ViewSequence.h`）：每帧倍率由帧数推算，最后一帧精确到达
+  `end_zoom`；编码器名称集合也一致（`mp4v|h264|avc1|h265|hevc|vp9|av1|mjpg`，见 `src/VideoCodec.h`）；
+- `center_x/center_y/start_zoom/end_zoom` 是 0.7.0 追加的**可选**字段：只有 `struct_size` 覆盖
+  整个结构体时才会被读取，旧调用者传 0.6.0 大小的结构体会自动使用默认动画；`start_zoom <= 0`
+  用默认 0.8，`end_zoom <= 0` 用默认推进倍率（`start_zoom × 1.05^280`）；
 - `fps` 与 `duration_seconds` 必须有限且为正，且 `fps * duration >= 1` 帧；
 - `MB_VIDEO_ERROR` 只表示"没有可用编码器"，与参数错误（`MB_INVALID_ARGUMENT`）区分开。
 

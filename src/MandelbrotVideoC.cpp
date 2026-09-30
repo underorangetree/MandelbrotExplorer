@@ -1,5 +1,6 @@
 #include "mandelbrot_explorer/video.h"
 #include <cmath>
+#include <cstddef>
 #include <exception>
 #include <new>
 #include <stdexcept>
@@ -44,12 +45,16 @@ auto guard(Function&& function) -> mb_status {
     }
 }
 
+// The original (0.6.0) layout. Newer callers may append fields and older
+// callers may pass a smaller struct_size, as long as it covers this prefix.
+constexpr std::size_t min_video_params_size = offsetof(mb_video_params, center_x);
+
 auto require_params(const mb_video_params* params) -> bool {
     if (params == nullptr) {
         last_error = "params must not be null";
         return false;
     }
-    if (params->struct_size < sizeof(mb_video_params)) {
+    if (params->struct_size < min_video_params_size) {
         last_error = "mb_video_params.struct_size is too small";
         return false;
     }
@@ -90,6 +95,24 @@ mb_status mb_write_video(const mb_video_params* params, const char* path) {
         last_error = "unknown codec: " + codec;
         return MB_INVALID_ARGUMENT;
     }
+    // The view fields are optional: only read them when the caller's
+    // struct_size covers them, otherwise keep the default animation. A
+    // start_zoom <= 0 selects the default start zoom (so a zero-initialized
+    // struct works), and end_zoom <= 0 keeps the default depth factor.
+    mandelbrot::ZoomAnimation animation;
+    if (params->struct_size >= sizeof(mb_video_params)) {
+        if (!std::isfinite(params->center_x) || !std::isfinite(params->center_y) ||
+            !std::isfinite(params->start_zoom) || !std::isfinite(params->end_zoom)) {
+            last_error = "center and zoom values must be finite";
+            return MB_INVALID_ARGUMENT;
+        }
+        animation.center_x = params->center_x;
+        animation.center_y = params->center_y;
+        if (params->start_zoom > 0.0) {
+            animation.start_zoom = params->start_zoom;
+        }
+        animation.end_zoom = params->end_zoom;
+    }
     return guard([&] {
         Mandelbrot impl(params->width, params->height, params->max_iterations, params->threads);
         if (params->kernel != nullptr && !impl.set_kernel(params->kernel)) {
@@ -117,9 +140,9 @@ mb_status mb_write_video(const mb_video_params* params, const char* path) {
             static_cast<void>(writer.set(cv::VIDEOWRITER_PROP_QUALITY, static_cast<double>(params->quality)));
         }
         for (int frame = 0; frame < total_frames; ++frame) {
-            impl.setView(mandelbrot::animation_zoom(frame, total_frames),
-                         mandelbrot::animation_center_x,
-                         mandelbrot::animation_center_y);
+            impl.setView(mandelbrot::animation_zoom(frame, total_frames, animation),
+                         animation.center_x,
+                         animation.center_y);
             writer.write(generate_mat(impl));
         }
         writer.release();

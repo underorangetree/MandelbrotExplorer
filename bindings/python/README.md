@@ -71,7 +71,13 @@ m.render_into(colors, iterations)                              # 使用 colors[:
 ```python
 me.write_video("zoom.mp4", 1920, 1080, max_iterations=2000, threads=0,
                         fps=60, duration=10, codec="h264", quality=-1)
+# 自定义视角：center 为中心点，start_zoom/end_zoom 为两端缩放（相等即静态视角）
+me.write_video("custom.mp4", 1280, 720, fps=30, duration=5,
+                        center=(-0.7436, 0.1318), start_zoom=1.0, end_zoom=1000.0)
 ```
+
+不传 `center`/`start_zoom`/`end_zoom` 时使用与 CLI 相同的默认动画；每帧倍率由帧数推算，
+最后一帧精确到达 `end_zoom`。
 
 ## 库的查找顺序
 

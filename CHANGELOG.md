@@ -13,6 +13,10 @@
 
 ### 新增
 
+- 自定义视角：CLI `--center <X,Y>`、`--start-zoom`、`--end-zoom`；`mb_video_params` 追加
+  `center_x/center_y/start_zoom/end_zoom`（可选字段，向后兼容旧调用者）；Python
+  `write_video(..., center=…, start_zoom=…, end_zoom=…)`。每帧倍率由帧数推算（三次贝塞尔缓动），
+  最后一帧精确到达结束缩放，两端相等即静态视角。
 - 安装规则补全：`cmake --install` 现在也会安装 CLI 应用；Windows 上（vcpkg 预设）会把 OpenCV
   运行库连同其第三方依赖一起装到 `bin/`，安装目录可直接分发。
 - 新增 `cpack` 分发包：Windows ZIP / 其他平台 TGZ，内含应用、库、头文件与 CMake 包配置。

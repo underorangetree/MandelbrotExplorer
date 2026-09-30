@@ -25,6 +25,10 @@ constexpr double min_fps = 0.001;
 constexpr double max_fps = 1000.0;
 constexpr double min_duration = 0.001;
 constexpr double max_duration = 86400.0;
+constexpr double min_zoom = 1e-12;
+constexpr double max_zoom = 1e12;
+constexpr double min_center = -10.0;
+constexpr double max_center = 10.0;
 
 const std::unordered_map<std::string, int> subcommand_index = {
     {"-o", 0},
@@ -39,7 +43,10 @@ const std::unordered_map<std::string, int> subcommand_index = {
     {"--kernel", 7},
     {"--threads", 8},
     {"--codec", 9},
-    {"--quality", 10}
+    {"--quality", 10},
+    {"--center", 11},
+    {"--start-zoom", 12},
+    {"--end-zoom", 13}
 };
 
 auto parse_int(const std::string& value, const std::string& arg, int min_value, int max_value) -> std::optional<int> {
@@ -96,7 +103,11 @@ void print_usage(const char* program) {
               << "  --threads <value>      Set render thread count, 0 = auto (default: " << default_threads << ")\n"
               << "  --kernel <name>        Force a kernel: auto|scalar|avx2|avx512|neon (default: " << defaults.kernel << ")\n"
               << "  --codec <name>         Set video codec: mp4v|h264|h265|vp9|av1|mjpg (default: " << defaults.codec << ")\n"
-              << "  --quality <value>      Set encoder quality 0-100 (default: " << defaults.quality << ", encoder default)\n";
+              << "  --quality <value>      Set encoder quality 0-100 (default: " << defaults.quality << ", encoder default)\n"
+              << "  --center <X,Y>         Set the animation center (default: " << defaults.animation.center_x << ',' << defaults.animation.center_y << ")\n"
+              << "  --start-zoom <value>   Set the zoom of the first frame (default: " << defaults.animation.start_zoom << ")\n"
+              << "  --end-zoom <value>     Set the zoom of the last frame (default: start-zoom * 1.05^280; equal to\n"
+              << "                         start-zoom for a static video)\n";
 }
 
 } // namespace
@@ -208,6 +219,38 @@ auto parse_command_line(std::span<char* const> args, RenderConfig& config) -> st
                         return ExitStatus::InvalidArgument;
                     }
                     config.quality = *parsed;
+                    break;
+                }
+                case 11: {
+                    const size_t comma = value.find(',');
+                    if (comma == std::string::npos || comma != value.rfind(',') ||
+                        comma == 0 || comma + 1 == value.size()) {
+                        std::cerr << "Invalid center format for " << arg << ": " << value << ". Please use X,Y.\n";
+                        return ExitStatus::InvalidArgument;
+                    }
+                    auto center_x = parse_double(value.substr(0, comma), arg + " (x)", min_center, max_center);
+                    auto center_y = parse_double(value.substr(comma + 1), arg + " (y)", min_center, max_center);
+                    if (!center_x || !center_y) {
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.animation.center_x = *center_x;
+                    config.animation.center_y = *center_y;
+                    break;
+                }
+                case 12: {
+                    auto parsed = parse_double(value, arg, min_zoom, max_zoom);
+                    if (!parsed) {
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.animation.start_zoom = *parsed;
+                    break;
+                }
+                case 13: {
+                    auto parsed = parse_double(value, arg, min_zoom, max_zoom);
+                    if (!parsed) {
+                        return ExitStatus::InvalidArgument;
+                    }
+                    config.animation.end_zoom = *parsed;
                     break;
                 }
                 default:

@@ -226,6 +226,11 @@ if(BUILD_TESTING)
         set_tests_properties(cli_small_render PROPERTIES
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             SKIP_RETURN_CODE 3)
+
+        add_test(NAME cli_custom_view COMMAND ${PROJECT_NAME} -s 64x64 --maxiter 8 --fps 2 --duration 1 --center -0.75,0.1 --start-zoom 2 --end-zoom 4 -o ctest_view.mp4)
+        set_tests_properties(cli_custom_view PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            SKIP_RETURN_CODE 3)
     endif()
 endif()
 

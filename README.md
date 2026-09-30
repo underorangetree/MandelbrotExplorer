@@ -108,6 +108,9 @@ Windows 上用 vcpkg 预设构建时，OpenCV 运行库（含其第三方依赖�
 --kernel <name>       强制使用指定内核：auto|scalar|avx2|avx512|neon（默认 auto）
 --codec <name>        输出编码器：mp4v|h264|h265|vp9|av1|mjpg（默认 mp4v）
 --quality <value>     编码质量 0-100（默认 -1，即编码器默认值）
+--center <X,Y>        动画/视角中心（默认 -0.743644,0.131826，海马谷深焦点）
+--start-zoom <value>  起始缩放（默认 0.8）
+--end-zoom <value>    结束缩放（默认 = 起始缩放 × 1.05^280；与起始相等即静态视角）
 ```
 
 示例：
@@ -116,7 +119,8 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 ```
 
 参数会被校验：宽/高 `[1, 32768]`、`--maxiter` `[1, 1000000]`、`--fps` `[0.001, 1000]`、
-`--duration` `[0.001, 86400]`、`--threads` `[0, 1024]`、`--quality` `[0, 100]`，`--codec` 限
+`--duration` `[0.001, 86400]`、`--threads` `[0, 1024]`、`--quality` `[0, 100]`、`--center` 坐标
+`[-10, 10]`、`--start-zoom`/`--end-zoom` `[1e-12, 1e12]`，`--codec` 限
 `mp4v|h264|h265|vp9|av1|mjpg`，且 `FPS × 时长 ≥ 1` 帧；非法输入会打印错误并退出。
 编码器是否可用取决于 OpenCV 的构建（FFmpeg 后端）；打不开时会报错退出，
 `--quality` 不被某编码器支持时打印警告并继续。
@@ -132,7 +136,9 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 | 4 | 内存分配失败 |
 | 5 | OpenCV 或运行期错误 |
 
-缩放动画曲线与目标中心点仍硬编码在 `src/ViewSequence.h` 中。
+缩放动画默认围绕海马谷深焦点做指数缩放，缓动为三次贝塞尔（等价于 smoothstep）：每帧倍率由
+帧数推算，因此最后一帧精确到达 `--end-zoom`；`--start-zoom` 与 `--end-zoom` 相等即静态视角，
+`--end-zoom` 小于起始值则是缩小动画。曲线与默认值定义在 `src/ViewSequence.h`。
 
 ## 作为库使用（C ABI）
 构建后会生成共享库 `mandelbrot_explorer`（`libmandelbrot_explorer.so` / `mandelbrot_explorer.dll`）和 C 头文件
@@ -228,7 +234,7 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 
 已知限制：
 
-- 缩放动画的中心点与参数固定在 `src/ViewSequence.h`，CLI 与库暂不支持自定义视角（见 ROADMAP）。
+- 缓动曲线形状（三次贝塞尔）与每帧倍率的推算规则目前不可调，只能设置中心与两端的缩放值。
 - 视频导出依赖 OpenCV 的编码后端；`--quality` 是否生效由具体编码器决定。
 - Python wheel：Linux 需要 glibc >= 2.28（manylinux_2_28），macOS wheel 为 arm64；其余平台从源码构建。
 - 尚未实现 2x 帧复用等进一步优化（见 ROADMAP）。
