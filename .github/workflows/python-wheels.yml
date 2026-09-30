@@ -154,3 +154,5 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         attestations: true
+        # Re-running a tag build must not fail on the files PyPI already has.
+        skip-existing: true

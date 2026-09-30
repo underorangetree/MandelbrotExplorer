@@ -9,6 +9,7 @@
 
 - CI：release job 为 `gh release view/create/upload` 显式传入 `--repo "$GITHUB_REPOSITORY"`
   （该 job 不检出仓库，之前无法推断仓库，导致 v0.6.0 的 GitHub Release 创建失败）。
+- CI：PyPI 发布启用 `skip-existing`，重跑 tag 构建不会因同名文件已存在而失败。
 
 ## [0.6.0] - 2026-09-30
 

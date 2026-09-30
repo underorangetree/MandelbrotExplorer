@@ -12,7 +12,7 @@ CI（`.github/workflows/python-wheels.yml`）为 Linux / Windows / macOS 构建 
 并发布到 PyPI（Trusted Publishing）：
 
 ```bash
-pip install mandelbrot-explorer                 # PyPI 首发后可用
+pip install mandelbrot-explorer                 # 从 PyPI 安装（0.6.0 起）
 # 或从 Release 下载对应平台的 wheel：
 pip install mandelbrot_explorer-*-py3-none-*.whl
 ```
