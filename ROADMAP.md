@@ -42,7 +42,8 @@
       （wheel 仅捆绑无依赖的核心库；Linux wheel 在 manylinux_2_28 容器内构建）
 - [x] PyPI 发布基础设施：Trusted Publishing publish job + tag/版本一致性校验（`check_version.py`）
 - [ ] 在 PyPI 配置 Trusted Publisher（`mandelbrot-explorer`）并完成首发（建议先 TestPyPI 演练）
-- [ ] （可选）CPack 压缩包、vcpkg 端口
+- [x] （可选）CPack 压缩包（Windows ZIP / 其他平台 TGZ）
+- [ ] （可选）vcpkg 端口
 
 ### CI 与质量
 

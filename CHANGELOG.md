@@ -9,6 +9,7 @@
 
 - 安装规则补全：`cmake --install` 现在也会安装 CLI 应用；Windows 上（vcpkg 预设）会把 OpenCV
   运行库连同其第三方依赖一起装到 `bin/`，安装目录可直接分发。
+- 新增 `cpack` 分发包：Windows ZIP / 其他平台 TGZ，内含应用、库、头文件与 CMake 包配置。
 - CMake 包支持：`cmake --install` 后可 `find_package(MandelbrotExplorer CONFIG)`，导入目标
   `MandelbrotExplorer::mandelbrot_explorer` 与 `MandelbrotExplorer::mandelbrot_explorer_video`
   （`SameMinorVersion` 版本校验；视频目标仅在 `MANDELBROT_EXPLORER_WITH_VIDEO=ON` 时提供）。

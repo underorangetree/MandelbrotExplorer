@@ -80,6 +80,8 @@ cmake --install build/linux-gcc                                     # Linux/macO
 Windows 上用 vcpkg 预设构建时，OpenCV 运行库（含其第三方依赖）会一并安装到 `bin/`，可直接
 分发；Linux/macOS 需要系统安装 OpenCV。
 
+也可以直接在构建目录里打包整个安装树：`cpack -C Release`（Windows 生成 ZIP，其他平台生成 TGZ）。
+
 ## 运行
 
 ```bash
