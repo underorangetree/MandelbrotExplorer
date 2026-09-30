@@ -7,6 +7,9 @@
 
 ### 新增
 
+- CMake 包支持：`cmake --install` 后可 `find_package(MandelbrotExplorer CONFIG)`，导入目标
+  `MandelbrotExplorer::mandelbrot_explorer` 与 `MandelbrotExplorer::mandelbrot_explorer_video`
+  （`SameMinorVersion` 版本校验；视频目标仅在 `MANDELBROT_EXPLORER_WITH_VIDEO=ON` 时提供）。
 - C ABI 共享库 `mandelbrot_explorer`（`include/mandelbrot_explorer/mandelbrot_explorer.h`）：
   不透明 context 与一次性参数 API、BGR/RGB 颜色输出、int32 迭代数组输出、无外部依赖的
   BMP/PNM 写图、渲染取消；渲染核心不再依赖 OpenCV。

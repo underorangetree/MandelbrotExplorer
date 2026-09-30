@@ -36,7 +36,7 @@
 
 ### 分发与打包
 
-- [ ] CMake 包配置：`install(EXPORT)` + `MandelbrotExplorerConfig.cmake`，支持 `find_package`
+- [x] CMake 包配置：`install(EXPORT)` + `MandelbrotExplorerConfig.cmake`，支持 `find_package`
 - [ ] 应用本体的 install 规则；Windows 运行期 OpenCV DLL 的处理说明
 - [x] Python 打包：`pyproject.toml` + staging 脚本 + Linux/Windows/macOS wheel 工作流
       （wheel 仅捆绑无依赖的核心库；Linux wheel 在 manylinux_2_28 容器内构建）

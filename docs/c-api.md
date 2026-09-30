@@ -23,6 +23,21 @@ MandelbrotExplorer 提供两个 C ABI 共享库，任何支持 FFI 的语言都�
 Windows 上核心库没有额外运行期依赖；`mandelbrot_explorer_video` 需要 OpenCV 的 DLL 位于
 `PATH` 或 exe 同目录。
 
+### 在 CMake 项目中使用
+
+安装后可以直接被 CMake 项目消费：
+
+```cmake
+find_package(MandelbrotExplorer CONFIG REQUIRED)
+target_link_libraries(app PRIVATE MandelbrotExplorer::mandelbrot_explorer)        # 无依赖的核心库
+target_link_libraries(app PRIVATE MandelbrotExplorer::mandelbrot_explorer_video)  # 可选：OpenCV 版视频库
+```
+
+用 `-DCMAKE_PREFIX_PATH=<安装前缀>`（或 `MandelbrotExplorer_DIR=<前缀>/lib/cmake/MandelbrotExplorer`）
+指向安装位置；以 `MANDELBROT_EXPLORER_WITH_VIDEO=OFF` 构建的安装只提供核心目标。CMake 会按
+`SameMinorVersion` 校验版本（0.x 期间次版本变化视为可能不兼容）。Windows 上运行期还需要把
+`bin/` 下的 DLL 放到可执行文件旁或 `PATH` 中。
+
 ## 核心概念
 
 ### 上下文与线程

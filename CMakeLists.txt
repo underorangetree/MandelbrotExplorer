@@ -75,7 +75,9 @@ add_library(mandelbrot_explorer SHARED
     src/MandelbrotC.cpp
     include/mandelbrot_explorer/mandelbrot_explorer.h)
 target_link_libraries(mandelbrot_explorer PRIVATE mandelbrot_explorer_core)
-target_include_directories(mandelbrot_explorer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(mandelbrot_explorer PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_definitions(mandelbrot_explorer PRIVATE
     MANDELBROT_EXPLORER_BUILD
     MANDELBROT_EXPLORER_VERSION="${PROJECT_VERSION}")
@@ -84,7 +86,9 @@ set_target_properties(mandelbrot_explorer PROPERTIES
     SOVERSION ${PROJECT_VERSION_MAJOR})
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 install(TARGETS mandelbrot_explorer
+    EXPORT MandelbrotExplorerTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -98,12 +102,15 @@ if(MANDELBROT_EXPLORER_WITH_VIDEO)
         src/MandelbrotVideoC.cpp
         include/mandelbrot_explorer/video.h)
     target_link_libraries(mandelbrot_explorer_video PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
-    target_include_directories(mandelbrot_explorer_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(mandelbrot_explorer_video PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
     target_compile_definitions(mandelbrot_explorer_video PRIVATE MANDELBROT_EXPLORER_VIDEO_BUILD)
     set_target_properties(mandelbrot_explorer_video PROPERTIES
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR})
     install(TARGETS mandelbrot_explorer_video
+        EXPORT MandelbrotExplorerTargets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -113,6 +120,26 @@ if(MANDELBROT_EXPLORER_WITH_VIDEO)
     add_executable(${PROJECT_NAME} src/main.cpp)
     target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
 endif()
+
+# CMake package: consumers install this project and use
+#   find_package(MandelbrotExplorer CONFIG REQUIRED)
+#   target_link_libraries(app PRIVATE MandelbrotExplorer::mandelbrot_explorer)
+# The video target is only present when MANDELBROT_EXPLORER_WITH_VIDEO is ON.
+install(EXPORT MandelbrotExplorerTargets
+    NAMESPACE MandelbrotExplorer::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MandelbrotExplorer)
+configure_package_config_file(cmake/MandelbrotExplorerConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/MandelbrotExplorerConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MandelbrotExplorer)
+# 0.x releases may break between minor versions.
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/MandelbrotExplorerConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMinorVersion)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/MandelbrotExplorerConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/MandelbrotExplorerConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MandelbrotExplorer)
 
 set(_mandelbrot_targets mandelbrot_explorer_core mandelbrot_explorer)
 if(MANDELBROT_EXPLORER_WITH_VIDEO)

@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/MandelbrotExplorerTargets.cmake")
+
+# The exported targets are shared libraries: their private dependencies
+# (Threads, OpenCV) are linked into the libraries themselves, so consumers do
+# not need those packages to be found.
+check_required_components(MandelbrotExplorer)

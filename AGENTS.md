@@ -54,6 +54,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
 - `include/mandelbrot_explorer/video.h` + `src/MandelbrotVideoC.cpp` - OpenCV-based video export shared library `mandelbrot_explorer_video` (`mb_write_video` with the app's animation); the core `mandelbrot` library stays dependency-free.
 - `src/ViewSequence.h` / `src/VideoCodec.h` - shared zoom animation curve and codec name -> fourcc mapping used by the app, the benchmark and the video API.
+- `cmake/MandelbrotExplorerConfig.cmake.in` - package config template; the install exports `MandelbrotExplorer::mandelbrot_explorer` and (with video) `MandelbrotExplorer::mandelbrot_explorer_video` for `find_package`.
 - `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found); `pyproject.toml`, `stage_libraries.py` and `retag_wheel.py` bundle the native library into platform-tagged wheels; `manylinux_build.sh` builds the Linux wheel inside the manylinux image and `check_version.py` guards releases against version mismatches.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.
