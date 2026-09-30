@@ -71,6 +71,20 @@ def main() -> int:
                                            center=(-0.5, 0.0), kernel="scalar")
         check(np.array_equal(one_shot, colors), "one-shot API matches the context API")
 
+    # Video export uses the optional mandelbrot_video library.
+    with tempfile.TemporaryDirectory() as directory:
+        clip = Path(directory) / "clip.mp4"
+        try:
+            mandelbrot.write_video(clip, 160, 120, max_iterations=32, threads=2,
+                                   fps=5.0, duration=1.0, kernel="scalar")
+        except FileNotFoundError as error:
+            print("mandelbrot_video not available:", error)
+            return 3
+        except mandelbrot.VideoError as error:
+            print("no usable video backend:", error)
+            return 3
+        check(clip.exists() and clip.stat().st_size > 0, "video file was written")
+
     try:
         mandelbrot.Mandelbrot(0, 0, 0)
     except mandelbrot.MandelbrotError as error:

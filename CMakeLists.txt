@@ -141,7 +141,7 @@ if(BUILD_TESTING)
     add_test(NAME c_api COMMAND c_api_smoke)
 
     add_executable(video_api_smoke tests/video_api_smoke.c)
-    target_link_libraries(video_api_smoke PRIVATE mandelbrot mandelbrot_video)
+    target_link_libraries(video_api_smoke PRIVATE mandelbrot_video)
     set_target_properties(video_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME video_api COMMAND video_api_smoke)
     # Exit code 3 = no usable video backend: skipped.

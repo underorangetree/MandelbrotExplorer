@@ -45,11 +45,11 @@ int main(void) {
 
     const mb_status status = mb_write_video(&params, "video_api_smoke.mp4");
     if (status == MB_VIDEO_ERROR) {
-        fprintf(stderr, "no usable video backend: %s\n", mb_last_error());
+        fprintf(stderr, "no usable video backend: %s\n", mb_video_last_error());
         return 3; /* skipped, like the CLI video test */
     }
     if (status != MB_OK) {
-        fprintf(stderr, "mb_write_video failed (%d): %s\n", (int)status, mb_last_error());
+        fprintf(stderr, "mb_write_video failed (%d): %s\n", (int)status, mb_video_last_error());
         return 1;
     }
 

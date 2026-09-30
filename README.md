@@ -155,6 +155,9 @@ import mandelbrot
 with mandelbrot.Mandelbrot(1280, 720, max_iterations=1000) as m:
     m.set_view(2.0, -0.5, 0.0)
     colors, iterations = m.render(iterations=True)   # (h, w, 3) uint8 / (h, w) int32
+
+# 视频导出需要 OpenCV 版的 mandelbrot_video 库：
+mandelbrot.write_video("zoom.mp4", 1920, 1080, fps=60, duration=10, codec="h264")
 ```
 
 ## 测试

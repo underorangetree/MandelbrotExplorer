@@ -35,12 +35,20 @@ iterations = np.empty((720, m.storage_width), dtype=np.int32)
 m.render_into(colors, iterations)                              # 使用 colors[:, :m.width] 得到有效区域
 ```
 
+视频导出（需要 OpenCV 版的 `mandelbrot_video` 库；找不到库抛 `FileNotFoundError`，
+没有可用编码器抛 `mandelbrot.VideoError`）：
+
+```python
+mandelbrot.write_video("zoom.mp4", 1920, 1080, max_iterations=2000, threads=0,
+                        fps=60, duration=10, codec="h264", quality=-1)
+```
+
 ## 库的查找顺序
 
 `m.set_...` 之前无需设置路径，绑定按以下顺序查找：
 
 1. `mandelbrot.load_library("path")` 或构造函数 / 函数参数 `library=...`
-2. 环境变量 `MANDELBROT_LIBRARY`
+2. 环境变量 `MANDELBROT_LIBRARY`（视频库为 `MANDELBROT_VIDEO_LIBRARY`）
 3. 包目录（与 `__init__.py` 同级）
 4. 仓库构建目录（`build/*/Release/mandelbrot.dll`、`build/*/libmandelbrot.so` 等）
 5. 系统搜索路径（`mandelbrot.dll` / `libmandelbrot.so` / `libmandelbrot.dylib`）

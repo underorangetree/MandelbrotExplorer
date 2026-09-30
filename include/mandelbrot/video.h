@@ -44,8 +44,11 @@ typedef struct mb_video_params {
 
 /* Renders the animation and writes it to `path`. Returns MB_VIDEO_ERROR when
  * the encoder cannot be opened (for example when OpenCV has no usable video
- * backend); the message is available through mb_last_error(). */
+ * backend); the message is available through mb_video_last_error(). */
 MB_VIDEO_API mb_status mb_write_video(const mb_video_params* params, const char* path);
+
+/* Message of the last failed mb_write_video() call on this thread. Never NULL. */
+MB_VIDEO_API const char* mb_video_last_error(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

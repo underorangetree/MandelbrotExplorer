@@ -60,6 +60,10 @@ auto require_params(const mb_video_params* params) -> bool {
 
 extern "C" {
 
+const char* mb_video_last_error(void) {
+    return last_error.c_str();
+}
+
 mb_status mb_write_video(const mb_video_params* params, const char* path) {
     if (!require_params(params)) {
         return MB_INVALID_ARGUMENT;

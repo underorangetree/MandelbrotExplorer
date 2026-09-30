@@ -17,7 +17,9 @@ Typical use::
 
 The library is located through ``load_library(path)``, the
 ``MANDELBROT_LIBRARY`` environment variable, the package directory, the
-repository build tree or the system search path, in that order.
+repository build tree or the system search path, in that order. Video export
+(``write_video``) uses the optional OpenCV-based ``mandelbrot_video`` library,
+located the same way through ``load_video_library``/``MANDELBROT_VIDEO_LIBRARY``.
 """
 
 from __future__ import annotations
@@ -36,10 +38,13 @@ except ImportError:  # pragma: no cover - exercised on minimal installs
 __all__ = [
     "Mandelbrot",
     "MandelbrotError",
+    "VideoError",
     "load_library",
+    "load_video_library",
     "render_frame",
     "render_image",
     "version",
+    "write_video",
 ]
 
 MB_OK = 0
@@ -59,7 +64,14 @@ _STATUS_NAMES = {
 _PIXEL_ORDERS = {"bgr": 0, "rgb": 1}
 _IMAGE_FORMATS = {"bmp": 0, "pnm": 1, "ppm": 1}
 
-_LIBRARY_NAMES = ("mandelbrot.dll", "libmandelbrot.so", "libmandelbrot.dylib")
+_CORE_LIBRARY_NAMES = ("mandelbrot.dll", "libmandelbrot.so", "libmandelbrot.dylib")
+_CORE_PATTERNS = ("build/*/Release/mandelbrot.dll", "build/*/mandelbrot.dll",
+                  "build/*/libmandelbrot.so*", "build/libmandelbrot.so*",
+                  "build/*/libmandelbrot.dylib")
+_VIDEO_LIBRARY_NAMES = ("mandelbrot_video.dll", "libmandelbrot_video.so", "libmandelbrot_video.dylib")
+_VIDEO_PATTERNS = ("build/*/Release/mandelbrot_video.dll", "build/*/mandelbrot_video.dll",
+                   "build/*/libmandelbrot_video.so*", "build/libmandelbrot_video.so*",
+                   "build/*/libmandelbrot_video.dylib")
 
 
 class MandelbrotError(RuntimeError):
@@ -90,23 +102,21 @@ _library: ctypes.CDLL | None = None
 _library_path: str | None = None
 
 
-def _candidate_paths(explicit: str | None) -> list[str]:
+def _search_candidates(explicit: str | None, env_var: str,
+                       names: tuple[str, ...], patterns: tuple[str, ...]) -> list[str]:
     candidates: list[str] = []
     if explicit:
         candidates.append(explicit)
-    from_env = os.environ.get("MANDELBROT_LIBRARY")
+    from_env = os.environ.get(env_var)
     if from_env:
         candidates.append(from_env)
     package_dir = Path(__file__).resolve().parent
-    for name in _LIBRARY_NAMES:
-        candidates.append(str(package_dir / name))
+    candidates.extend(str(package_dir / name) for name in names)
     # Repository build tree (handy when running from a checkout).
     repo = package_dir.parents[2]
-    for pattern in ("build/*/Release/mandelbrot.dll", "build/*/mandelbrot.dll",
-                    "build/*/libmandelbrot.so*", "build/libmandelbrot.so*",
-                    "build/*/libmandelbrot.dylib"):
+    for pattern in patterns:
         candidates.extend(str(path) for path in sorted(repo.glob(pattern)))
-    candidates.extend(_LIBRARY_NAMES)
+    candidates.extend(names)
     return candidates
 
 
@@ -121,9 +131,10 @@ def load_library(path: str | None = None) -> str:
     if _library is not None:
         if path is None or Path(path).resolve() == Path(_library_path or "").resolve():
             return _library_path or ""
+    candidates = _search_candidates(path, "MANDELBROT_LIBRARY", _CORE_LIBRARY_NAMES, _CORE_PATTERNS)
     errors: list[str] = []
-    for candidate in _candidate_paths(path):
-        if candidate in _LIBRARY_NAMES or Path(candidate).exists():
+    for candidate in candidates:
+        if candidate in _CORE_LIBRARY_NAMES or Path(candidate).exists():
             try:
                 library = ctypes.CDLL(candidate)
             except OSError as error:  # pragma: no cover - platform dependent
@@ -135,7 +146,7 @@ def load_library(path: str | None = None) -> str:
             return candidate
     raise FileNotFoundError(
         "could not locate the mandelbrot shared library; build the `mandelbrot` "
-        "target or set MANDELBROT_LIBRARY. Tried: " + ", ".join(_candidate_paths(path))
+        "target or set MANDELBROT_LIBRARY. Tried: " + ", ".join(candidates)
         + (("; errors: " + "; ".join(errors)) if errors else "")
     )
 
@@ -181,6 +192,87 @@ def _error_message() -> str:
 def _check(status: int) -> None:
     if status != MB_OK:
         raise MandelbrotError(status, _error_message())
+
+
+# -- optional video library --------------------------------------------------
+
+class VideoError(MandelbrotError):
+    """Raised when no usable video encoder is available."""
+
+
+class _VideoParams(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", c_size_t),
+        ("width", c_int),
+        ("height", c_int),
+        ("max_iterations", c_int),
+        ("threads", c_int),
+        ("fps", c_double),
+        ("duration_seconds", c_double),
+        ("kernel", c_char_p),
+        ("pixel_order", c_int),
+        ("codec", c_char_p),
+        ("quality", c_int),
+    ]
+
+
+_video_library: ctypes.CDLL | None = None
+_video_library_path: str | None = None
+
+
+def load_video_library(path: str | None = None) -> str:
+    """Loads the optional OpenCV-based ``mandelbrot_video`` shared library.
+
+    Needed by :func:`write_video`; searches the same places as
+    :func:`load_library`, with ``MANDELBROT_VIDEO_LIBRARY`` as the override.
+    Raises :class:`FileNotFoundError` when the library is not built.
+    """
+    global _video_library, _video_library_path
+    if _video_library is not None:
+        if path is None or Path(path).resolve() == Path(_video_library_path or "").resolve():
+            return _video_library_path or ""
+    candidates = _search_candidates(path, "MANDELBROT_VIDEO_LIBRARY",
+                                    _VIDEO_LIBRARY_NAMES, _VIDEO_PATTERNS)
+    errors: list[str] = []
+    for candidate in candidates:
+        if candidate in _VIDEO_LIBRARY_NAMES or Path(candidate).exists():
+            try:
+                library = ctypes.CDLL(candidate)
+            except OSError as error:  # pragma: no cover - platform dependent
+                errors.append(f"{candidate}: {error}")
+                continue
+            library.mb_write_video.restype = c_int
+            library.mb_write_video.argtypes = [POINTER(_VideoParams), c_char_p]
+            library.mb_video_last_error.restype = c_char_p
+            _video_library = library
+            _video_library_path = candidate
+            return candidate
+    raise FileNotFoundError(
+        "could not locate the mandelbrot_video shared library; build the "
+        "`mandelbrot_video` target or set MANDELBROT_VIDEO_LIBRARY. Tried: "
+        + ", ".join(candidates)
+        + (("; errors: " + "; ".join(errors)) if errors else "")
+    )
+
+
+def _lib_video() -> ctypes.CDLL:
+    if _video_library is None:
+        load_video_library()
+    assert _video_library is not None
+    return _video_library
+
+
+def _video_error_message() -> str:
+    message = _lib_video().mb_video_last_error()
+    return message.decode("utf-8", "replace") if message else "unknown error"
+
+
+def _check_video(status: int) -> None:
+    if status == MB_OK:
+        return
+    if status == MB_VIDEO_ERROR:
+        raise VideoError(status, _video_error_message())
+    raise MandelbrotError(status, _video_error_message())
 
 
 def _pixel_order_value(name: str) -> int:
@@ -396,3 +488,31 @@ def render_image(path: str, width: int, height: int, *, max_iterations: int = 20
     params = _make_params(width, height, max_iterations, threads, zoom, center[0], center[1],
                           kernel, pixel_order)
     _check(_lib().mb_render_image(ctypes.byref(params), str(path).encode(), _image_format_value(format)))
+
+
+def write_video(path: str, width: int = 1920, height: int = 1080, *, max_iterations: int = 2000,
+                threads: int = 0, fps: float = 60.0, duration: float = 10.0,
+                kernel: str | None = None, pixel_order: str = "bgr",
+                codec: str | None = None, quality: int = -1,
+                library: str | None = None) -> None:
+    """Renders the application's zoom animation and writes it to ``path``.
+
+    Needs the optional OpenCV-based ``mandelbrot_video`` library. Raises
+    :class:`VideoError` when no usable encoder is available, and
+    :class:`FileNotFoundError` when the library itself is not built.
+    """
+    if library is not None:
+        load_video_library(library)
+    params = _VideoParams()
+    params.struct_size = ctypes.sizeof(_VideoParams)
+    params.width = width
+    params.height = height
+    params.max_iterations = max_iterations
+    params.threads = threads
+    params.fps = fps
+    params.duration_seconds = duration
+    params.kernel = kernel.encode() if kernel else None
+    params.pixel_order = _pixel_order_value(pixel_order)
+    params.codec = codec.encode() if codec else None
+    params.quality = quality
+    _check_video(_lib_video().mb_write_video(ctypes.byref(params), str(path).encode()))
