@@ -204,7 +204,8 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
             zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, total_frames));
             mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
             TimePoint start = std::chrono::steady_clock::now();
-            mandelbrot.generate_into(frame_buffers[static_cast<std::size_t>(index)].storage);
+            mandelbrot.generate_into(frame_buffers[static_cast<std::size_t>(index)].storage.data,
+                                     frame_buffers[static_cast<std::size_t>(index)].storage.step);
             TimePoint end = std::chrono::steady_clock::now();
             double elapsed = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()) / 1'000'000.0;
             progress_update_elapsed += elapsed;

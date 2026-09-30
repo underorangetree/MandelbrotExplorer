@@ -7,6 +7,7 @@
 #include <limits>
 #include <opencv2/core.hpp>
 #include "Mandelbrot.h"
+#include "MandelbrotOpenCV.h"
 
 namespace {
 
@@ -30,18 +31,18 @@ auto measure(Mandelbrot::Schedule schedule, int width, int height, int max_itera
     mandelbrot.set_schedule(schedule);
     apply_kernel_from_env(mandelbrot);
     mandelbrot.setView(zoom, center_x, center_y);
-    static_cast<void>(mandelbrot.generate()); // warm-up
+    static_cast<void>(generate_mat(mandelbrot)); // warm-up
 
     const auto start = std::chrono::steady_clock::now();
     for (int frame = 0; frame < frames; ++frame) {
         mandelbrot.setView(zoom, center_x, center_y);
-        static_cast<void>(mandelbrot.generate());
+        static_cast<void>(generate_mat(mandelbrot));
     }
     const auto end = std::chrono::steady_clock::now();
     const double seconds = std::chrono::duration<double>(end - start).count();
 
     // Checksum computed outside the timed loop so it cannot skew the result.
-    const cv::Mat image = mandelbrot.generate();
+    const cv::Mat image = generate_mat(mandelbrot);
     const cv::Scalar sum = cv::sum(image);
     const auto checksum = static_cast<unsigned long long>(sum[0] + sum[1] + sum[2]);
     return {.seconds_per_frame=seconds / frames, .checksum=checksum};
@@ -66,7 +67,7 @@ auto measure_animation_once(Mandelbrot::Schedule schedule, int width, int height
     for (int frame = 0; frame < frames; ++frame) {
         const double zoom = 0.8 * std::pow(1.05, smoothstep(0.0, 280.0, frame, frames));
         mandelbrot.setView(zoom, center_x, center_y);
-        static_cast<void>(mandelbrot.generate());
+        static_cast<void>(generate_mat(mandelbrot));
     }
     const auto end = std::chrono::steady_clock::now();
     return std::chrono::duration<double>(end - start).count();

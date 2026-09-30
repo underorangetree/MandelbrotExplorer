@@ -15,6 +15,7 @@
 #include "CommandLine.h"
 #include "ExitStatus.h"
 #include "Mandelbrot.h"
+#include "MandelbrotOpenCV.h"
 #include "MandelbrotKernel.h"
 #include "ThreadPool.h"
 
@@ -66,14 +67,14 @@ void test_known_point_iterations() {
 void test_mandelbrot_known_points() {
     Mandelbrot mandelbrot(16, 16, 64);
     mandelbrot.setView(1.0, 0.0, 0.0);
-    cv::Mat image = mandelbrot.generate();
+    cv::Mat image = generate_mat(mandelbrot);
     CHECK(image.cols == 16 && image.rows == 16);
     CHECK(image.at<cv::Vec3b>(8, 8) == cv::Vec3b(0, 0, 0)); // (0,0) is in the set; interior is black
 }
 
 void test_crop_to_requested_width() {
     Mandelbrot mandelbrot(17, 16, 64);
-    cv::Mat image = mandelbrot.generate();
+    cv::Mat image = generate_mat(mandelbrot);
     CHECK(image.cols == 17 && image.rows == 16);
 }
 
@@ -84,8 +85,8 @@ void test_schedule_equivalence() {
     per_row.setView(1.5, -0.5, 0.0);
     tiled.set_schedule(Mandelbrot::Schedule::Tiled);
     per_row.set_schedule(Mandelbrot::Schedule::PerRow);
-    const cv::Mat a = tiled.generate();
-    const cv::Mat b = per_row.generate();
+    const cv::Mat a = generate_mat(tiled);
+    const cv::Mat b = generate_mat(per_row);
     CHECK(a.size() == b.size());
     CHECK(cv::norm(a, b, cv::NORM_INF) == 0.0);
 }
@@ -271,13 +272,13 @@ void test_kernel_matches_scalar() {
 void test_forced_kernel_rendering() {
     Mandelbrot automatic(64, 32, 64);
     automatic.setView(1.0, 0.0, 0.0);
-    const cv::Mat reference = automatic.generate();
+    const cv::Mat reference = generate_mat(automatic);
 
     Mandelbrot forced_scalar(64, 32, 64);
     forced_scalar.setView(1.0, 0.0, 0.0);
     CHECK(forced_scalar.set_kernel("scalar"));
     CHECK(std::string(forced_scalar.kernel_name()) == "scalar");
-    CHECK(cv::norm(forced_scalar.generate(), reference, cv::NORM_INF) == 0.0);
+    CHECK(cv::norm(generate_mat(forced_scalar), reference, cv::NORM_INF) == 0.0);
 
     for (const char* name : {"avx512", "avx2", "neon"}) {
         if (find_kernel(name).function == nullptr) {
@@ -287,7 +288,7 @@ void test_forced_kernel_rendering() {
         forced.setView(1.0, 0.0, 0.0);
         CHECK(forced.set_kernel(name));
         CHECK(std::string(forced.kernel_name()) == name);
-        CHECK(cv::norm(forced.generate(), reference, cv::NORM_INF) == 0.0);
+        CHECK(cv::norm(generate_mat(forced), reference, cv::NORM_INF) == 0.0);
     }
 }
 
@@ -297,20 +298,20 @@ void test_forced_kernel_rendering() {
 void test_generate_into() {
     Mandelbrot mandelbrot(64, 32, 64);
     mandelbrot.setView(1.0, -0.5, 0.0);
-    const cv::Mat reference = mandelbrot.generate();
+    const cv::Mat reference = generate_mat(mandelbrot);
 
     cv::Mat storage(32, mandelbrot.storage_width(), CV_8UC3);
-    mandelbrot.generate_into(storage);
+    generate_into_mat(mandelbrot, storage);
     CHECK(cv::norm(storage(cv::Rect(0, 0, 64, 32)), reference, cv::NORM_INF) == 0.0);
 
     cv::Mat wider(32, mandelbrot.storage_width() + 32, CV_8UC3);
-    mandelbrot.generate_into(wider);
+    generate_into_mat(mandelbrot, wider);
     CHECK(cv::norm(wider(cv::Rect(0, 0, 64, 32)), reference, cv::NORM_INF) == 0.0);
 
     bool threw = false;
     try {
         cv::Mat wrong_type(32, mandelbrot.storage_width(), CV_8UC1);
-        mandelbrot.generate_into(wrong_type);
+        generate_into_mat(mandelbrot, wrong_type);
     } catch (const std::invalid_argument&) {
         threw = true;
     }
@@ -319,7 +320,7 @@ void test_generate_into() {
     threw = false;
     try {
         cv::Mat too_narrow(32, mandelbrot.storage_width() - 1, CV_8UC3);
-        mandelbrot.generate_into(too_narrow);
+        generate_into_mat(mandelbrot, too_narrow);
     } catch (const std::invalid_argument&) {
         threw = true;
     }
@@ -328,7 +329,7 @@ void test_generate_into() {
     threw = false;
     try {
         cv::Mat wrong_height(31, mandelbrot.storage_width(), CV_8UC3);
-        mandelbrot.generate_into(wrong_height);
+        generate_into_mat(mandelbrot, wrong_height);
     } catch (const std::invalid_argument&) {
         threw = true;
     }

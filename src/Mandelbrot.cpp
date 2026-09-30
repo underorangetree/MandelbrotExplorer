@@ -50,12 +50,9 @@ Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations, int _threads
     r_data(static_cast<double*>(operator new(static_cast<size_t>(width) * sizeof(double), std::align_val_t(32)))),
     i_data(static_cast<double*>(operator new(static_cast<size_t>(height) * sizeof(double), std::align_val_t(32)))),
     thread_pool(height, validate_thread_count(_threads)),
-    image(height, width, CV_8UC3) {
-    if (!image.isContinuous()) {
-        throw std::runtime_error("cv::Mat image is not continuous");
-    }
-    output_data_ = image.data;
-    output_step_ = image.step;
+    image(static_cast<size_t>(height) * width * 3) {
+    output_data_ = image.data();
+    output_step_ = static_cast<size_t>(width) * 3;
     const KernelSelection selection = select_kernel();
     kernel_ = selection.function;
     kernel_name_ = selection.name;
@@ -103,21 +100,25 @@ void Mandelbrot::render_tile(int row_index, int x_begin, int x_end) {
     kernel_(context);
 }
 
-auto Mandelbrot::generate() -> cv::Mat {
-    generate_into(image);
-    return image(cv::Rect(0, 0, requested_width, height));
+auto Mandelbrot::generate() -> const uint8_t* {
+    generate_into(image.data(), static_cast<size_t>(width) * 3);
+    return image.data();
 }
 
-auto Mandelbrot::generate_into(cv::Mat& target) -> void {
-    if (target.type() != CV_8UC3 || target.rows != height || target.cols < width) {
-        throw std::invalid_argument("frame buffer must be CV_8UC3 with " + std::to_string(height) +
-                                    " rows and at least " + std::to_string(width) + " columns");
+auto Mandelbrot::generate_into(uint8_t* buffer, std::size_t stride) -> void {
+    if (buffer == nullptr || stride < static_cast<size_t>(width) * 3) {
+        throw std::invalid_argument("frame buffer must provide " + std::to_string(height) +
+                                    " rows of at least " + std::to_string(width) + " BGR pixels");
     }
-    output_data_ = target.data;
-    output_step_ = target.step;
+    output_data_ = buffer;
+    output_step_ = stride;
     if (schedule_ == Schedule::PerRow) {
-        for (int row_index = 0; row_index < height; ++row_index) {
-            thread_pool.enqueue([this, row_index]() { render_tile(row_index, 0, width); });
+        for (int row_index = 0; row_index < height && !is_cancelled(); ++row_index) {
+            thread_pool.enqueue([this, row_index]() {
+                if (!is_cancelled()) {
+                    render_tile(row_index, 0, width);
+                }
+            });
         }
         thread_pool.wait_all_idle();
     } else {
@@ -131,6 +132,9 @@ auto Mandelbrot::generate_into(cv::Mat& target) -> void {
         for (int worker = 0; worker < workers; ++worker) {
             thread_pool.enqueue([this, &next_row]() {
                 for (;;) {
+                    if (is_cancelled()) {
+                        return;
+                    }
                     const int row_index = next_row.fetch_add(1, std::memory_order_relaxed);
                     if (row_index >= height) {
                         return;
@@ -141,8 +145,8 @@ auto Mandelbrot::generate_into(cv::Mat& target) -> void {
         }
         thread_pool.wait_all_idle();
     }
-    output_data_ = image.data;
-    output_step_ = image.step;
+    output_data_ = image.data();
+    output_step_ = static_cast<size_t>(width) * 3;
 }
 
 auto Mandelbrot::kernel_name() const -> const char* {

@@ -1,11 +1,11 @@
 #pragma once
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <new>
 #include <vector>
-#include <opencv2/core.hpp>
 #include "ThreadPool.h"
 #include "MandelbrotKernel.h"
 class Mandelbrot {
@@ -31,9 +31,10 @@ private:
     std::unique_ptr<double, AlignedDelete> r_data;
     std::unique_ptr<double, AlignedDelete> i_data;
     ThreadPool thread_pool;
-    cv::Mat image;
+    std::vector<uint8_t> image; // height x width x 3, BGR
     uint8_t* output_data_ = nullptr;
     std::size_t output_step_ = 0;
+    std::atomic<bool> cancel_requested_{false};
     RowKernel kernel_ = nullptr;
     const char* kernel_name_ = "unknown";
     Schedule schedule_ = Schedule::Tiled;
@@ -51,16 +52,32 @@ public:
     // Overrides the runtime-selected kernel. Returns false if the name is
     // unknown or the CPU does not support it.
     auto set_kernel(const char* name) -> bool;
+    // Cancels a render in progress: the generate*() calls return after the rows
+    // that are already running, leaving a partially rendered frame. The flag is
+    // sticky until reset_cancel(); request_cancel() is safe to call from any
+    // thread.
+    void request_cancel() noexcept { cancel_requested_.store(true, std::memory_order_relaxed); }
+    void reset_cancel() noexcept { cancel_requested_.store(false, std::memory_order_relaxed); }
+    [[nodiscard]] auto is_cancelled() const noexcept -> bool {
+        return cancel_requested_.load(std::memory_order_relaxed);
+    }
 private:
     void render_tile(int row_index, int x_begin, int x_end);
 public:
-    [[nodiscard]] auto generate() -> cv::Mat;
+    [[nodiscard]] auto frame_width() const -> int { return requested_width; }
+    [[nodiscard]] auto frame_height() const -> int { return height; }
     // Padded width of the storage a frame must provide: the kernels render whole
     // 32-column blocks, so a smaller buffer would be written past its rows.
     [[nodiscard]] auto storage_width() const -> int { return width; }
-    // Renders into `target` (CV_8UC3, `height` rows, at least `storage_width()`
-    // columns) instead of the internal buffer, so several frames can be in
-    // flight without copying. The caller must keep `target` untouched until the
-    // frame has been consumed.
-    auto generate_into(cv::Mat& target) -> void;
+    // Renders into the internal buffer and returns its first pixel. The buffer
+    // holds `height` rows of `storage_width() * 3` bytes (BGR); only the first
+    // `requested_width()` columns are meaningful.
+    [[nodiscard]] auto generate() -> const uint8_t*;
+    // First pixel of the last rendered frame (internal buffer).
+    [[nodiscard]] auto frame_data() const -> const uint8_t* { return image.data(); }
+    // Renders into a caller-owned BGR8 buffer instead of the internal one, so
+    // several frames can be in flight without copying. `stride` is in bytes and
+    // must be at least `storage_width() * 3`; the caller must keep the buffer
+    // untouched until the call returns.
+    auto generate_into(uint8_t* buffer, std::size_t stride) -> void;
 };

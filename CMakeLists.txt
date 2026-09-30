@@ -2,7 +2,7 @@
 cmake_policy(SET CMP0074 NEW)
 project(MandelbrotExplorer VERSION 0.5.0
         DESCRIPTION "A Mandelbrot set explorer using OpenCV"
-        LANGUAGES CXX)
+        LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -30,7 +30,10 @@ add_library(mandelbrot_core STATIC
     src/ThreadPool.h
 )
 target_include_directories(mandelbrot_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(mandelbrot_core PUBLIC ${OpenCV_LIBS} Threads::Threads)
+# The renderer core is OpenCV-free; only the app and the tests use OpenCV.
+target_link_libraries(mandelbrot_core PUBLIC Threads::Threads)
+# The core is linked into the shared C ABI library, so it must be position independent.
+set_target_properties(mandelbrot_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Keep every kernel on the exact operation sequence written in the source.
 # Otherwise GCC/Clang may contract a*b+c into an FMA in one kernel but not in
@@ -59,10 +62,31 @@ elseif((_mandelbrot_arch MATCHES "aarch64|arm64") AND NOT MSVC)
     set_source_files_properties(src/MandelbrotKernel_neon.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
-add_executable(${PROJECT_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_core)
+# Shared library with a C ABI, callable from other languages through FFI.
+add_library(mandelbrot SHARED
+    src/MandelbrotC.cpp
+    include/mandelbrot/mandelbrot.h)
+target_link_libraries(mandelbrot PRIVATE mandelbrot_core)
+target_include_directories(mandelbrot PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(mandelbrot PRIVATE
+    MANDELBROT_BUILD
+    MANDELBROT_VERSION="${PROJECT_VERSION}")
+set_target_properties(mandelbrot PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR})
 
-foreach(target mandelbrot_core ${PROJECT_NAME})
+include(GNUInstallDirs)
+install(TARGETS mandelbrot
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES include/mandelbrot/mandelbrot.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot)
+
+add_executable(${PROJECT_NAME} src/main.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_core ${OpenCV_LIBS})
+
+foreach(target mandelbrot_core mandelbrot ${PROJECT_NAME})
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -87,11 +111,16 @@ endforeach()
 include(CTest)
 if(BUILD_TESTING)
     add_executable(mandelbrot_tests tests/mandelbrot_tests.cpp)
-    target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_core)
+    target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_core ${OpenCV_LIBS})
     add_test(NAME unit COMMAND mandelbrot_tests)
 
     add_executable(mandelbrot_benchmark tests/benchmark.cpp)
-    target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_core)
+    target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_core ${OpenCV_LIBS})
+
+    add_executable(c_api_smoke tests/c_api_smoke.c)
+    target_link_libraries(c_api_smoke PRIVATE mandelbrot)
+    set_target_properties(c_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+    add_test(NAME c_api COMMAND c_api_smoke)
 
     add_test(NAME cli_help COMMAND ${PROJECT_NAME} --help)
 
