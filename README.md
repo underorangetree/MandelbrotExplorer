@@ -135,6 +135,15 @@ mb_destroy(ctx);
 与 `mb_render_image(params, path, format)`（`mb_render_params` 需填 `struct_size`）。
 一个 context 持有自己的工作线程池，**不要跨线程并发调用同一个 context**（`mb_cancel` 例外）。
 
+Python 封装见 [`bindings/python`](bindings/python/README.md)（ctypes + numpy 零拷贝，无需编译）：
+
+```python
+import mandelbrot
+with mandelbrot.Mandelbrot(1280, 720, max_iterations=1000) as m:
+    m.set_view(2.0, -0.5, 0.0)
+    colors, iterations = m.render(iterations=True)   # (h, w, 3) uint8 / (h, w) int32
+```
+
 ## 测试
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON

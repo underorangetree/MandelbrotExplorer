@@ -122,6 +122,15 @@ if(BUILD_TESTING)
     set_target_properties(c_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME c_api COMMAND c_api_smoke)
 
+    # Python binding self-test (skipped with exit code 3 when numpy is absent).
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME python_binding
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/selftest.py
+                         --library $<TARGET_FILE:mandelbrot>)
+        set_tests_properties(python_binding PROPERTIES SKIP_RETURN_CODE 3)
+    endif()
+
     add_test(NAME cli_help COMMAND ${PROJECT_NAME} --help)
 
     add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
