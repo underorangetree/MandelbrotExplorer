@@ -260,12 +260,17 @@ int main(void) {
 
 ## ABI 兼容性
 
-- 句柄是不透明的；`mb_*` 符号是公开约定，函数语义变更视为破坏性变更（参见 `ROADMAP.md`
-  的 API 冻结计划）；
-- `mb_render_params` / `mb_video_params` 均以 `struct_size` 开头，后续版本只**追加以尾字段**，
-  调用者按自己的 `sizeof` 填写即可安全使用；
-- 未知枚举值会被拒绝（返回 `MB_INVALID_ARGUMENT`）；
-- 1.0 后将按语义化版本管理，破坏性变更会提升 `SOVERSION` 并写入 `CHANGELOG.md`。
+- 句柄（`mb_context`）不透明；导出的 `mb_*` 符号及其语义是公开约定，语义变更按破坏性变更处理；
+- `mb_render_params` / `mb_video_params` 均以 `struct_size` 开头，按以下规则演进：
+  - 调用者始终填写自己头文件版本的 `sizeof`；
+  - 后续版本只在**结构体末尾追加字段**，库只读取 `struct_size` 覆盖到的字段，未覆盖的新字段使用
+    默认值，因此旧调用者仍可工作；
+  - 当前所有字段都是初始字段，`struct_size` 小于 `sizeof(...)` 会返回
+    `MB_INVALID_ARGUMENT`，尽早暴露头文件与库不匹配；
+- 未知枚举值会被拒绝（返回 `MB_INVALID_ARGUMENT`），不会触发未定义行为；
+- 弃用流程：先在头文件注释与 `CHANGELOG.md` 标注，至少保留一个次版本号后再移除；
+- 版本与 `SOVERSION`：0.x 期间次版本号递增可能破坏 ABI（`SOVERSION` 保持 `0`），请固定使用具体
+  版本；1.0 起 `SOVERSION` 跟随主版本号，破坏性变更只随主版本发生。
 
 ## 常见陷阱
 

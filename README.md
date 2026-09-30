@@ -121,6 +121,17 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 编码器是否可用取决于 OpenCV 的构建（FFmpeg 后端）；打不开时会报错退出，
 `--quality` 不被某编码器支持时打印警告并继续。
 
+进程退出码（`ExitStatus`）：
+
+| 码 | 含义 |
+| --- | --- |
+| 0 | 成功 |
+| 1 | 内部错误（正常使用不应出现） |
+| 2 | 参数非法 |
+| 3 | 无法打开视频编码器（无可用后端；ctest 以此为跳过标志） |
+| 4 | 内存分配失败 |
+| 5 | OpenCV 或运行期错误 |
+
 缩放动画曲线与目标中心点仍硬编码在 `src/ViewSequence.h` 中。
 
 ## 作为库使用（C ABI）
@@ -192,6 +203,35 @@ ctest --test-dir build --output-on-failure
 mandelbrot_benchmark             # 固定视角，对比按行与原子任务窃取调度
 mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 ```
+
+## 公开 API 与版本策略
+
+公开接口有三类，随项目版本一起发布：
+
+1. **CLI**：参数与退出码见上；
+2. **C ABI**：`include/mandelbrot_explorer/*.h` 导出的 `mb_*` 符号（见 [docs/c-api.md](docs/c-api.md)）；
+3. **Python 包**：`bindings/python` 的 `mandelbrot_explorer`。
+
+三者遵循[语义化版本](https://semver.org/lang/zh-CN/)：**0.x 期间次版本号递增表示可能包含破坏性
+变更**（会记录在 [CHANGELOG.md](CHANGELOG.md)），修订号只修复问题；1.0 之后破坏性变更只随主版本号
+发生。0.x 期间依赖 C ABI 的程序建议固定到具体版本（如 `mandelbrot-explorer==0.6.0`）。动态库的
+`SOVERSION` 目前为 `0`，1.0 起跟随主版本号。
+
+## 平台支持与已知限制
+
+| 平台 | 构建/测试 | 说明 |
+| --- | --- | --- |
+| Windows x64（MSVC） | CI 覆盖 VS 2022；preset 另有 VS 2026 与 MinGW | `cmake --install`/`cpack` 自带 OpenCV 运行库 |
+| Linux x64 / ARM64（gcc、clang） | CI 覆盖 | 需要系统 OpenCV；ARM64 使用 NEON 内核 |
+| macOS arm64（Apple Clang） | CI 覆盖 | Homebrew OpenCV；Intel Mac 未在 CI 覆盖 |
+| 无 OpenCV 的环境 | `-DMANDELBROT_EXPLORER_WITH_VIDEO=OFF` | 只构建核心库与 C ABI |
+
+已知限制：
+
+- 缩放动画的中心点与参数固定在 `src/ViewSequence.h`，CLI 与库暂不支持自定义视角（见 ROADMAP）。
+- 视频导出依赖 OpenCV 的编码后端；`--quality` 是否生效由具体编码器决定。
+- Python wheel：Linux 需要 glibc >= 2.28（manylinux_2_28），macOS wheel 为 arm64；其余平台从源码构建。
+- 尚未实现 2x 帧复用等进一步优化（见 ROADMAP）。
 
 ## 架构简介
 - `Mandelbrot.cpp` – 共享框架（不依赖 OpenCV）：生命周期、坐标预计算、颜色表、调度、取消，

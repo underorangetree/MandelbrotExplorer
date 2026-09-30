@@ -9,7 +9,7 @@
 
 首个包含 C ABI 共享库的版本：库、CMake 目标、头文件路径与环境变量均以项目名命名
 （`mandelbrot_explorer` / `mandelbrot_explorer_video`），导出的 C 符号为 `mb_*`。
-0.x 期间 C ABI 仍可能变动，破坏性变更会记录在本文件并体现在 `SOVERSION` 上。
+0.x 期间 C ABI 仍可能变动，破坏性变更会记录在本文件（`SOVERSION` 自 1.0 起跟随主版本号）。
 
 ### 新增
 

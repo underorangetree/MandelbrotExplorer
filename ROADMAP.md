@@ -24,9 +24,9 @@
 
 ### API 冻结
 
-- [ ] 在 README 写明三大公开面（CLI、C ABI、Python 包）与其 SemVer 承诺
-- [ ] C ABI 稳定性规则：`SOVERSION` 的升级条件、`struct_size` 加性演进、弃用流程
-- [ ] 文档化进程退出码（`ExitStatus`）与库状态码（`mb_status`）
+- [x] 在 README 写明三大公开面（CLI、C ABI、Python 包）与其 SemVer 承诺
+- [x] C ABI 稳定性规则：`SOVERSION` 的升级条件、`struct_size` 加性演进、弃用流程
+- [x] 文档化进程退出码（`ExitStatus`）与库状态码（`mb_status`）
 
 ### 功能收口
 
@@ -55,7 +55,7 @@
 ### 文档
 
 - [x] `CHANGELOG.md`
-- [ ] README 平台支持矩阵与已知限制
+- [x] README 平台支持矩阵与已知限制
 - [x] `docs/` 下的 C ABI 使用教程（`docs/c-api.md`）
 
 ## 1.0 完成标准
