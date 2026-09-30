@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "mandelbrot_explorer/mandelbrot_explorer.h"
@@ -25,9 +26,17 @@ int main(void) {
     if (mb_write_video(&params, NULL) != MB_INVALID_ARGUMENT) {
         return 1;
     }
+    if (mb_write_video(&params, "") != MB_INVALID_ARGUMENT) {
+        return 1;
+    }
     {
         mb_video_params bad = params;
         bad.fps = 0.0;
+        if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
+            return 1;
+        }
+        bad = params;
+        bad.fps = NAN;
         if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
             return 1;
         }
@@ -37,12 +46,46 @@ int main(void) {
             return 1;
         }
         bad = params;
+        bad.duration_seconds = NAN;
+        if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
+            return 1;
+        }
+        bad = params;
         bad.codec = "bogus";
         if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
             return 1;
         }
+        bad = params;
+        bad.kernel = "bogus";
+        if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
+            return 1;
+        }
+        bad = params;
+        bad.pixel_order = (mb_pixel_order)9;
+        if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
+            return 1;
+        }
+        bad = params;
+        bad.struct_size = 0;
+        if (mb_write_video(&bad, "video_api_smoke.mp4") != MB_INVALID_ARGUMENT) {
+            return 1;
+        }
+    }
+    if (mb_video_last_error() == NULL || mb_video_last_error()[0] == '\0') {
+        fprintf(stderr, "a failed call must leave an error message behind\n");
+        return 1;
     }
 
+    /* An unwritable path fails while opening the encoder (MB_VIDEO_ERROR, not
+     * a crash); this is not the "no backend" skip path. */
+    if (mb_write_video(&params, "no_such_directory/video_api_smoke.mp4") != MB_VIDEO_ERROR) {
+        fprintf(stderr, "an unwritable path must report MB_VIDEO_ERROR\n");
+        return 1;
+    }
+
+    /* The main write covers the default codec (NULL) and the quality path. */
+    params.codec = NULL;
+    params.quality = 50;
     const mb_status status = mb_write_video(&params, "video_api_smoke.mp4");
     if (status == MB_VIDEO_ERROR) {
         fprintf(stderr, "no usable video backend: %s\n", mb_video_last_error());
@@ -63,6 +106,20 @@ int main(void) {
     remove("video_api_smoke.mp4");
     if (size <= 0) {
         return 1;
+    }
+
+    /* RGB output with the encoder-default quality. */
+    {
+        mb_video_params rgb = params;
+        rgb.width = 160;
+        rgb.height = 120;
+        rgb.max_iterations = 8;
+        rgb.pixel_order = MB_RGB;
+        rgb.quality = -1;
+        if (mb_write_video(&rgb, "video_api_smoke_rgb.mp4") != MB_OK) {
+            return 1;
+        }
+        remove("video_api_smoke_rgb.mp4");
     }
 
     printf("video api smoke OK (%ld bytes)\n", size);

@@ -59,6 +59,28 @@ def main() -> int:
         check(np.array_equal(rgb[..., 2], colors[..., 0]), "rgb blue channel")
         ctx.set_pixel_order("bgr")
 
+        # Parameter errors surface as Python exceptions.
+        try:
+            ctx.set_kernel("bogus")
+        except me.MandelbrotError:
+            pass
+        else:
+            raise AssertionError("an unknown kernel must raise MandelbrotError")
+
+        try:
+            ctx.set_pixel_order("bogus")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("an unknown pixel order must raise ValueError")
+
+        try:
+            ctx.render(colors=False, iterations=False)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("rendering without outputs must raise ValueError")
+
         with tempfile.TemporaryDirectory() as directory:
             bmp = Path(directory) / "frame.bmp"
             ppm = Path(directory) / "frame.ppm"

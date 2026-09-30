@@ -161,6 +161,13 @@ if(BUILD_TESTING)
     add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
     set_tests_properties(cli_invalid_size PROPERTIES WILL_FAIL TRUE)
 
+    # On x86 the NEON kernel is not compiled in: run() must reject it before
+    # opening the video writer (on aarch64, NEON is the native kernel).
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i.86")
+        add_test(NAME cli_kernel_unavailable COMMAND ${PROJECT_NAME} --kernel neon)
+        set_tests_properties(cli_kernel_unavailable PROPERTIES WILL_FAIL TRUE)
+    endif()
+
     add_test(NAME cli_small_render COMMAND ${PROJECT_NAME} -s 320x240 --maxiter 16 --fps 1 --duration 1 -o ctest_out.mp4)
     # ExitStatus::VideoWriterError == 3: treated as "skipped" so the test does not
     # fail on OpenCV builds without a usable video writer backend.

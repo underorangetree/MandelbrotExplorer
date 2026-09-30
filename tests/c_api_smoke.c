@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,24 @@
         }                                                                                   \
     } while (0)
 
+static unsigned long read_u16(const unsigned char* data) {
+    return (unsigned long)data[0] | ((unsigned long)data[1] << 8);
+}
+
+static unsigned long read_u32(const unsigned char* data) {
+    return read_u16(data) | (read_u16(data + 2) << 16);
+}
+
+static size_t read_file(const char* path, unsigned char* buffer, size_t capacity) {
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        return 0;
+    }
+    const size_t size = fread(buffer, 1, capacity, file);
+    fclose(file);
+    return size;
+}
+
 int main(void) {
     CHECK(mb_version() != NULL);
     CHECK(mb_last_error() != NULL);
@@ -18,6 +37,21 @@ int main(void) {
     /* Invalid arguments are reported through the status/error API. */
     CHECK(mb_create(0, 0, 0, 0) == NULL);
     CHECK(mb_last_error()[0] != '\0');
+
+    /* NULL contexts and unknown enum values are reported, never dereferenced. */
+    CHECK(mb_width(NULL) == 0 && mb_height(NULL) == 0);
+    CHECK(mb_storage_width(NULL) == 0 && mb_thread_count(NULL) == 0);
+    CHECK(mb_kernel_name(NULL) == NULL && mb_frame_data(NULL) == NULL);
+    CHECK(mb_render(NULL) == MB_INVALID_ARGUMENT);
+    CHECK(mb_render_into(NULL, NULL, 0) == MB_INVALID_ARGUMENT);
+    CHECK(mb_render_outputs(NULL, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_view(NULL, 1.0, 0.0, 0.0) == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_kernel(NULL, "scalar") == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_pixel_order(NULL, MB_BGR) == MB_INVALID_ARGUMENT);
+    CHECK(mb_write_image(NULL, "never.bmp", MB_IMAGE_BMP) == MB_INVALID_ARGUMENT);
+    CHECK(mb_render_frame(NULL, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+    CHECK(mb_render_image(NULL, "never.bmp", MB_IMAGE_BMP) == MB_INVALID_ARGUMENT);
+    mb_cancel(NULL); /* safe */
 
     mb_context* ctx = mb_create(64, 32, 64, 2);
     CHECK(ctx != NULL);
@@ -29,10 +63,21 @@ int main(void) {
 
     CHECK(mb_set_view(ctx, 1.0, -0.5, 0.0) == MB_OK);
     CHECK(mb_set_view(ctx, 0.0, 0.0, 0.0) == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_view(ctx, 1.0, NAN, 0.0) == MB_INVALID_ARGUMENT);
     CHECK(mb_set_kernel(ctx, "scalar") == MB_OK);
     CHECK(strcmp(mb_kernel_name(ctx), "scalar") == 0);
     CHECK(mb_set_kernel(ctx, "bogus") == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_kernel(ctx, NULL) == MB_INVALID_ARGUMENT);
+    CHECK(mb_set_pixel_order(ctx, (mb_pixel_order)9) == MB_INVALID_ARGUMENT);
 
+    /* threads = 0 selects the hardware concurrency. */
+    mb_context* automatic = mb_create(8, 8, 8, 0);
+    CHECK(automatic != NULL);
+    CHECK(mb_thread_count(automatic) >= 1);
+    mb_destroy(automatic);
+
+    /* Cancellation is sticky; the next render clears it first. */
+    mb_cancel(ctx);
     CHECK(mb_render(ctx) == MB_OK);
     const unsigned char* frame = mb_frame_data(ctx);
     CHECK(frame != NULL);
@@ -82,24 +127,68 @@ int main(void) {
     CHECK(mb_set_pixel_order(ctx, MB_BGR) == MB_OK);
     free(rgb);
 
-    /* Image files (dependency-free BMP / PNM writers). */
+    /* Image files (dependency-free BMP / PNM writers): validate the header and
+     * every pixel against the rendered BGR frame. */
     CHECK(mb_write_image(ctx, "c_api_smoke.bmp", MB_IMAGE_BMP) == MB_OK);
     CHECK(mb_write_image(ctx, "c_api_smoke.ppm", MB_IMAGE_PNM) == MB_OK);
     {
-        unsigned char magic[2] = {0, 0};
-        FILE* file = fopen("c_api_smoke.bmp", "rb");
-        CHECK(file != NULL);
-        CHECK(fread(magic, 1, 2, file) == 2);
-        fclose(file);
-        CHECK(magic[0] == 'B' && magic[1] == 'M');
-        file = fopen("c_api_smoke.ppm", "rb");
-        CHECK(file != NULL);
-        CHECK(fread(magic, 1, 2, file) == 2);
-        fclose(file);
-        CHECK(magic[0] == 'P' && magic[1] == '6');
+        const int width = mb_width(ctx);
+        const int height = mb_height(ctx);
+        const size_t row_size = (size_t)((width * 3 + 3) / 4) * 4; /* BMP rows pad to 4 bytes */
+        const size_t bmp_size = 54 + row_size * (size_t)height;
+        unsigned char* bmp = (unsigned char*)malloc(bmp_size + 16);
+        unsigned char* pnm = (unsigned char*)malloc((size_t)width * (size_t)height * 3 + 64);
+        CHECK(bmp != NULL && pnm != NULL);
+
+        CHECK(read_file("c_api_smoke.bmp", bmp, bmp_size + 16) == bmp_size);
+        CHECK(bmp[0] == 'B' && bmp[1] == 'M');
+        CHECK(read_u32(bmp + 2) == (unsigned long)bmp_size); /* file size */
+        CHECK(read_u32(bmp + 10) == 54);                     /* pixel data offset */
+        CHECK(read_u32(bmp + 14) == 40);                     /* DIB header size */
+        CHECK(read_u32(bmp + 18) == (unsigned long)width && read_u32(bmp + 22) == (unsigned long)height);
+        CHECK(read_u16(bmp + 28) == 24);                     /* bits per pixel */
+        for (int y = 0; y < height; ++y) {
+            /* BMP stores rows bottom-up, in BGR order. */
+            const unsigned char* file_row = bmp + 54 + row_size * (size_t)(height - 1 - y);
+            const unsigned char* frame_row = frame + (size_t)y * stride;
+            for (int x = 0; x < width; ++x) {
+                for (int channel = 0; channel < 3; ++channel) {
+                    CHECK(file_row[x * 3 + channel] == frame_row[x * 3 + channel]);
+                }
+            }
+            for (size_t padding = (size_t)width * 3; padding < row_size; ++padding) {
+                CHECK(file_row[padding] == 0);
+            }
+        }
+
+        char pnm_header[64];
+        const int pnm_header_length = snprintf(pnm_header, sizeof(pnm_header), "P6\n%d %d\n255\n", width, height);
+        CHECK(pnm_header_length > 0);
+        CHECK(read_file("c_api_smoke.ppm", pnm, (size_t)width * (size_t)height * 3 + 64) ==
+              (size_t)pnm_header_length + (size_t)width * (size_t)height * 3);
+        CHECK(memcmp(pnm, pnm_header, (size_t)pnm_header_length) == 0);
+        for (int y = 0; y < height; ++y) {
+            /* PNM stores rows top-down, in RGB order. */
+            const unsigned char* file_row = pnm + pnm_header_length + (size_t)y * (size_t)width * 3;
+            const unsigned char* frame_row = frame + (size_t)y * stride;
+            for (int x = 0; x < width; ++x) {
+                CHECK(file_row[x * 3 + 0] == frame_row[x * 3 + 2]);
+                CHECK(file_row[x * 3 + 1] == frame_row[x * 3 + 1]);
+                CHECK(file_row[x * 3 + 2] == frame_row[x * 3 + 0]);
+            }
+        }
+        free(pnm);
+        free(bmp);
         remove("c_api_smoke.bmp");
         remove("c_api_smoke.ppm");
     }
+
+    /* Unwritable paths and unknown formats fail without crashing. */
+    CHECK(mb_write_image(ctx, NULL, MB_IMAGE_BMP) == MB_INVALID_ARGUMENT);
+    CHECK(mb_write_image(ctx, "c_api_smoke.bmp", (mb_image_format)9) == MB_INVALID_ARGUMENT);
+    CHECK(mb_write_image(ctx, "no_such_directory/out.bmp", MB_IMAGE_BMP) == MB_INTERNAL_ERROR);
+    CHECK(mb_write_image(ctx, "no_such_directory/out.ppm", MB_IMAGE_PNM) == MB_INTERNAL_ERROR);
+    CHECK(mb_last_error()[0] != '\0');
 
     /* One-shot parameter API matches the context-based render. */
     {
@@ -120,8 +209,58 @@ int main(void) {
         CHECK(mb_render_frame(&params, one_shot, stride, NULL, 0) == MB_OK);
         CHECK(memcmp(frame, one_shot, (size_t)32 * stride) == 0);
         free(one_shot);
+
+        /* Iterations-only output matches the context render. */
+        int32_t* one_shot_iterations = (int32_t*)malloc((size_t)32 * iteration_stride);
+        CHECK(one_shot_iterations != NULL);
+        CHECK(mb_render_frame(&params, NULL, 0, one_shot_iterations, iteration_stride) == MB_OK);
+        CHECK(memcmp(iterations, one_shot_iterations, (size_t)32 * iteration_stride) == 0);
+        free(one_shot_iterations);
+
+        /* RGB output matches a context render in RGB order. */
+        params.pixel_order = MB_RGB;
+        unsigned char* one_shot_rgb = (unsigned char*)malloc((size_t)32 * stride);
+        unsigned char* context_rgb = (unsigned char*)malloc((size_t)32 * stride);
+        CHECK(one_shot_rgb != NULL && context_rgb != NULL);
+        CHECK(mb_render_frame(&params, one_shot_rgb, stride, NULL, 0) == MB_OK);
+        CHECK(mb_set_pixel_order(ctx, MB_RGB) == MB_OK);
+        CHECK(mb_render_into(ctx, context_rgb, stride) == MB_OK);
+        CHECK(memcmp(one_shot_rgb, context_rgb, (size_t)32 * stride) == 0);
+        CHECK(mb_set_pixel_order(ctx, MB_BGR) == MB_OK);
+        free(context_rgb);
+        free(one_shot_rgb);
+        params.pixel_order = MB_BGR;
+
         CHECK(mb_render_image(&params, "c_api_smoke_oneshot.bmp", MB_IMAGE_BMP) == MB_OK);
         remove("c_api_smoke_oneshot.bmp");
+
+        /* Invalid one-shot parameters fail with MB_INVALID_ARGUMENT. */
+        {
+            mb_render_params bad = params;
+            bad.zoom = 0.0;
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.center_x = NAN;
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.kernel = "bogus";
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.pixel_order = (mb_pixel_order)9;
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.width = 0;
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.max_iterations = 1000001;
+            CHECK(mb_render_frame(&bad, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+
+            CHECK(mb_render_image(&params, NULL, MB_IMAGE_BMP) == MB_INVALID_ARGUMENT);
+            CHECK(mb_render_image(&params, "c_api_smoke_oneshot.bmp", (mb_image_format)9) == MB_INVALID_ARGUMENT);
+            bad = params;
+            bad.kernel = "bogus";
+            CHECK(mb_render_image(&bad, "c_api_smoke_oneshot.bmp", MB_IMAGE_BMP) == MB_INVALID_ARGUMENT);
+        }
 
         params.struct_size = 0;
         CHECK(mb_render_frame(&params, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);

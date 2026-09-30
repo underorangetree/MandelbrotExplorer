@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -18,6 +19,7 @@
 #include "MandelbrotOpenCV.h"
 #include "MandelbrotKernel.h"
 #include "ThreadPool.h"
+#include "VideoCodec.h"
 
 // Always-on check: unlike CHECK(), it fires even with NDEBUG defined, so the
 // tests cannot silently become no-ops in a Release build.
@@ -152,9 +154,13 @@ void test_command_line_errors() {
         {"prog", "--width", "-5"},
         {"prog", "--fps", "0"},
         {"prog", "--fps", "nan"},
+        {"prog", "--fps", "abc"},
         {"prog", "--duration", "-1"},
+        {"prog", "--duration", "abc"},
         {"prog", "--maxiter", "abc"},
         {"prog", "-o", ""},
+        {"prog", "--width"},
+        {"prog", "--duration"},
         {"prog", "--unknown"},
         {"prog", "--fps", "0.1", "--duration", "1"},
         {"prog", "--width", "32769"},
@@ -216,9 +222,9 @@ struct AlignedDelete {
 };
 
 // Renders the same rows with the scalar kernel and with every kernel available
-// in this build and supported by the CPU, then compares the buffers byte for
-// byte. The color map encodes the iteration count, so any difference in the
-// escape-time result shows up as a byte diff.
+// in this build and supported by the CPU, then compares both the color and the
+// iteration-count buffers byte for byte. The color map encodes the iteration
+// count, so any difference in the escape-time result shows up as a byte diff.
 void test_kernel_matches_scalar() {
     constexpr int width = 32;
     constexpr int height = 8;
@@ -232,6 +238,8 @@ void test_kernel_matches_scalar() {
     std::vector<std::array<uint8_t, 3>> color_map(max_iterations + 1);
     std::vector<uint8_t> scalar_buffer(static_cast<size_t>(width) * height * 3);
     std::vector<uint8_t> kernel_buffer(static_cast<size_t>(width) * height * 3);
+    std::vector<std::int32_t> scalar_iterations(static_cast<size_t>(width) * height);
+    std::vector<std::int32_t> kernel_iterations(static_cast<size_t>(width) * height);
 
     for (int col = 0; col < width; ++col) {
         r_data.get()[col] = (col - width / 2) * delta - 0.5;
@@ -248,7 +256,9 @@ void test_kernel_matches_scalar() {
     for (int row = 0; row < height; ++row) {
         const RowContext context{.r_data=r_data.get(), .ci=i_data[row],
                                  .row_ptr=scalar_buffer.data() + static_cast<size_t>(row) * width * 3,
-                                 .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data()};
+                                 .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data(),
+                                 .iterations=scalar_iterations.data() + static_cast<size_t>(row) * width,
+                                 .iterations_step=width * sizeof(std::int32_t)};
         render_row_scalar(context);
     }
 
@@ -260,10 +270,13 @@ void test_kernel_matches_scalar() {
         for (int row = 0; row < height; ++row) {
             const RowContext context{.r_data=r_data.get(), .ci=i_data[row],
                                      .row_ptr=kernel_buffer.data() + static_cast<size_t>(row) * width * 3,
-                                     .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data()};
+                                     .x_begin=0, .x_end=width, .max_iterations=max_iterations, .color_map=color_map.data(),
+                                     .iterations=kernel_iterations.data() + static_cast<size_t>(row) * width,
+                                     .iterations_step=width * sizeof(std::int32_t)};
             selection.function(context);
         }
         CHECK(kernel_buffer == scalar_buffer);
+        CHECK(kernel_iterations == scalar_iterations);
     }
 }
 
@@ -372,6 +385,99 @@ void test_iterations_and_pixel_order() {
                   rgb[i + 2] == colors_only[i];
     }
     CHECK(swapped);
+}
+
+// Every accepted codec name maps to the expected fourcc; unknown names are
+// rejected by video_codec_known() before the writer is touched, and the fourcc
+// fallback stays mp4v.
+void test_video_codec_mapping() {
+    for (const char* name : {"mp4v", "h264", "avc1", "h265", "hevc", "vp9", "av1", "mjpg"}) {
+        CHECK(mandelbrot::video_codec_known(name));
+    }
+    CHECK(!mandelbrot::video_codec_known(""));
+    CHECK(!mandelbrot::video_codec_known("H264"));
+    CHECK(!mandelbrot::video_codec_known("bogus"));
+
+    CHECK(mandelbrot::video_codec_fourcc("mp4v") == cv::VideoWriter::fourcc('m', 'p', '4', 'v'));
+    CHECK(mandelbrot::video_codec_fourcc("bogus") == cv::VideoWriter::fourcc('m', 'p', '4', 'v'));
+    CHECK(mandelbrot::video_codec_fourcc("h264") == cv::VideoWriter::fourcc('a', 'v', 'c', '1'));
+    CHECK(mandelbrot::video_codec_fourcc("avc1") == cv::VideoWriter::fourcc('a', 'v', 'c', '1'));
+    CHECK(mandelbrot::video_codec_fourcc("h265") == cv::VideoWriter::fourcc('h', 'e', 'v', '1'));
+    CHECK(mandelbrot::video_codec_fourcc("hevc") == cv::VideoWriter::fourcc('h', 'e', 'v', '1'));
+    CHECK(mandelbrot::video_codec_fourcc("vp9") == cv::VideoWriter::fourcc('v', 'p', '0', '9'));
+    CHECK(mandelbrot::video_codec_fourcc("av1") == cv::VideoWriter::fourcc('a', 'v', '0', '1'));
+    CHECK(mandelbrot::video_codec_fourcc("mjpg") == cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+}
+
+// generate_frame() rejects an empty output set and buffers the kernels would
+// write past; exactly minimal strides are accepted.
+void test_generate_frame_validation() {
+    Mandelbrot mandelbrot(32, 16, 32);
+    mandelbrot.setView(1.0, -0.5, 0.0);
+    const std::size_t storage_stride = static_cast<std::size_t>(mandelbrot.storage_width()) * 3;
+
+    bool threw = false;
+    try {
+        mandelbrot.generate_frame({});
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    std::vector<uint8_t> colors(static_cast<std::size_t>(16) * storage_stride);
+    threw = false;
+    try {
+        mandelbrot.generate_frame({.bgr=colors.data(), .bgr_stride=storage_stride - 1});
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    std::vector<std::int32_t> iterations(static_cast<std::size_t>(16) * mandelbrot.storage_width());
+    threw = false;
+    try {
+        mandelbrot.generate_frame({.iterations=iterations.data(),
+                                   .iterations_stride=mandelbrot.storage_width() * sizeof(std::int32_t) - 1});
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    CHECK(threw);
+
+    mandelbrot.generate_frame({.bgr=colors.data(),
+                               .bgr_stride=storage_stride,
+                               .iterations=iterations.data(),
+                               .iterations_stride=mandelbrot.storage_width() * sizeof(std::int32_t)});
+}
+
+// Cancellation is sticky until reset_cancel(); a render started while the flag
+// is set leaves the buffers untouched under both schedules.
+void test_cancellation() {
+    constexpr int width = 32;
+    constexpr int height = 16;
+    Mandelbrot mandelbrot(width, height, 64);
+    mandelbrot.setView(1.5, -0.5, 0.0);
+    CHECK(!mandelbrot.is_cancelled());
+    mandelbrot.request_cancel();
+    CHECK(mandelbrot.is_cancelled());
+
+    const auto untouched = [](const std::vector<uint8_t>& buffer) -> bool {
+        return std::all_of(buffer.begin(), buffer.end(), [](uint8_t value) { return value == 0xAB; });
+    };
+    const std::size_t stride = static_cast<std::size_t>(mandelbrot.storage_width()) * 3;
+    std::vector<uint8_t> buffer(static_cast<std::size_t>(height) * stride, 0xAB);
+    mandelbrot.generate_frame({.bgr=buffer.data(), .bgr_stride=stride});
+    CHECK(untouched(buffer));
+
+    // PerRow must not even enqueue work while the flag is set.
+    mandelbrot.set_schedule(Mandelbrot::Schedule::PerRow);
+    mandelbrot.generate_frame({.bgr=buffer.data(), .bgr_stride=stride});
+    CHECK(untouched(buffer));
+
+    mandelbrot.set_schedule(Mandelbrot::Schedule::Tiled);
+    mandelbrot.reset_cancel();
+    CHECK(!mandelbrot.is_cancelled());
+    mandelbrot.generate_frame({.bgr=buffer.data(), .bgr_stride=stride});
+    CHECK(!untouched(buffer));
 }
 
 // Regression: GCC/Clang may contract a*b+c into an FMA in one kernel but not in
@@ -501,6 +607,9 @@ auto main() -> int {
     test_forced_kernel_rendering();
     test_generate_into();
     test_iterations_and_pixel_order();
+    test_video_codec_mapping();
+    test_generate_frame_validation();
+    test_cancellation();
     test_kernel_rounding_ties();
     test_mandelbrot_constructor_validation();
     return 0;
