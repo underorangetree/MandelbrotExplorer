@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### 修复
+
+- CI：release job 为 `gh release view/create/upload` 显式传入 `--repo "$GITHUB_REPOSITORY"`
+  （该 job 不检出仓库，之前无法推断仓库，导致 v0.6.0 的 GitHub Release 创建失败）。
+
 ## [0.6.0] - 2026-09-30
 
 首个包含 C ABI 共享库的版本：库、CMake 目标、头文件路径与环境变量均以项目名命名
