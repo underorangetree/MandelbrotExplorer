@@ -1,18 +1,18 @@
 /* Video export API (zoom animation -> video file).
  *
- * This API lives in the OpenCV-based `mandelbrot_video` shared library so the
+ * This API lives in the OpenCV-based `mandelbrot_explorer_video` shared library so the
  * core `mandelbrot` library stays dependency-free. Build one target with the
  * application's zoom animation (see src/ViewSequence.h) and encode it with the
  * configured codec (see src/VideoCodec.h).
  */
-#ifndef MANDELBROT_VIDEO_H
-#define MANDELBROT_VIDEO_H
+#ifndef MANDELBROT_EXPLORER_VIDEO_H
+#define MANDELBROT_EXPLORER_VIDEO_H
 
 #include <stddef.h>
-#include "mandelbrot/mandelbrot.h"
+#include "mandelbrot_explorer/mandelbrot_explorer.h"
 
 #if defined(_WIN32)
-#  if defined(MANDELBROT_VIDEO_BUILD)
+#  if defined(MANDELBROT_EXPLORER_VIDEO_BUILD)
 #    define MB_VIDEO_API __declspec(dllexport)
 #  else
 #    define MB_VIDEO_API __declspec(dllimport)
@@ -54,4 +54,4 @@ MB_VIDEO_API const char* mb_video_last_error(void);
 } /* extern "C" */
 #endif
 
-#endif /* MANDELBROT_VIDEO_H */
+#endif /* MANDELBROT_EXPLORER_VIDEO_H */

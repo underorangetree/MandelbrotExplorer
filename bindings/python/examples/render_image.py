@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import mandelbrot
+import mandelbrot_explorer as me
 
 
 def main() -> int:
@@ -36,18 +36,18 @@ def main() -> int:
     center = (args.center[0], args.center[1])
     format = "pnm" if args.output.endswith((".ppm", ".pnm")) else "bmp"
     if args.library:
-        mandelbrot.load_library(args.library)
+        me.load_library(args.library)
 
     if args.iterations:
-        iterations = mandelbrot.render_frame(
+        iterations = me.render_frame(
             width, height, max_iterations=args.maxiter, zoom=args.zoom, center=center,
             kernel=args.kernel, colors=False, iterations=True)
         print(f"iterations: min {iterations.min()} max {iterations.max()} "
               f"mean {iterations.mean():.1f}")
 
-    mandelbrot.render_image(args.output, width, height, max_iterations=args.maxiter,
+    me.render_image(args.output, width, height, max_iterations=args.maxiter,
                             zoom=args.zoom, center=center, kernel=args.kernel, format=format)
-    print(f"wrote {args.output} ({width}x{height}, library {mandelbrot.version()})")
+    print(f"wrote {args.output} ({width}x{height}, library {me.version()})")
     return 0
 
 

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "mandelbrot/mandelbrot.h"
-#include "mandelbrot/video.h"
+#include "mandelbrot_explorer/mandelbrot_explorer.h"
+#include "mandelbrot_explorer/video.h"
 
 int main(void) {
     mb_video_params params;

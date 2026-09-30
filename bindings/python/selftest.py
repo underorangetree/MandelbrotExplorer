@@ -3,7 +3,7 @@
 
 Run from a checkout or build tree, for example:
 
-    python3 bindings/python/selftest.py --library build/libmandelbrot.so
+    python3 bindings/python/selftest.py --library build/libmandelbrot_explorer.so
 
 Exits with code 3 when numpy is missing so ctest can mark it as skipped.
 """
@@ -21,7 +21,7 @@ except ImportError:
     print("numpy is required for the self-test", file=sys.stderr)
     sys.exit(3)
 
-import mandelbrot
+import mandelbrot_explorer as me
 
 
 def check(condition: bool, message: str) -> None:
@@ -34,11 +34,11 @@ def main() -> int:
     parser.add_argument("--library", help="path to the mandelbrot shared library")
     args = parser.parse_args()
     if args.library:
-        mandelbrot.load_library(args.library)
+        me.load_library(args.library)
 
-    print("library version:", mandelbrot.version())
+    print("library version:", me.version())
 
-    with mandelbrot.Mandelbrot(64, 32, max_iterations=64, threads=2, kernel="scalar") as ctx:
+    with me.Mandelbrot(64, 32, max_iterations=64, threads=2, kernel="scalar") as ctx:
         ctx.set_view(1.0, -0.5, 0.0)
         colors, iterations = ctx.render(colors=True, iterations=True)
         check(colors.shape == (32, 64, 3) and colors.dtype == np.uint8, "color shape/dtype")
@@ -67,27 +67,27 @@ def main() -> int:
             check(bmp.read_bytes()[:2] == b"BM", "bmp magic")
             check(ppm.read_bytes()[:2] == b"P6", "pnm magic")
 
-        one_shot = mandelbrot.render_frame(64, 32, max_iterations=64, threads=2, zoom=1.0,
+        one_shot = me.render_frame(64, 32, max_iterations=64, threads=2, zoom=1.0,
                                            center=(-0.5, 0.0), kernel="scalar")
         check(np.array_equal(one_shot, colors), "one-shot API matches the context API")
 
-    # Video export uses the optional mandelbrot_video library.
+    # Video export uses the optional mandelbrot_explorer_video library.
     with tempfile.TemporaryDirectory() as directory:
         clip = Path(directory) / "clip.mp4"
         try:
-            mandelbrot.write_video(clip, 160, 120, max_iterations=32, threads=2,
+            me.write_video(clip, 160, 120, max_iterations=32, threads=2,
                                    fps=5.0, duration=1.0, kernel="scalar")
         except FileNotFoundError as error:
-            print("mandelbrot_video not available:", error)
+            print("mandelbrot_explorer_video not available:", error)
             return 3
-        except mandelbrot.VideoError as error:
+        except me.VideoError as error:
             print("no usable video backend:", error)
             return 3
         check(clip.exists() and clip.stat().st_size > 0, "video file was written")
 
     try:
-        mandelbrot.Mandelbrot(0, 0, 0)
-    except mandelbrot.MandelbrotError as error:
+        me.Mandelbrot(0, 0, 0)
+    except me.MandelbrotError as error:
         check("width" in str(error), "error message mentions the invalid argument")
     else:
         raise AssertionError("invalid dimensions must raise MandelbrotError")

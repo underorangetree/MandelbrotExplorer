@@ -1,4 +1,4 @@
-#include "mandelbrot/video.h"
+#include "mandelbrot_explorer/video.h"
 #include <cmath>
 #include <exception>
 #include <new>

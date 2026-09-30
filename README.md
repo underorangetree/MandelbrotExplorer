@@ -109,12 +109,12 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 缩放动画曲线与目标中心点仍硬编码在 `main.cpp` 中。
 
 ## 作为库使用（C ABI）
-构建后会生成共享库 `mandelbrot`（`libmandelbrot.so` / `mandelbrot.dll`）和 C 头文件
-`include/mandelbrot/mandelbrot.h`，可被任何支持 FFI 的语言调用（Python ctypes、C# P/Invoke、
+构建后会生成共享库 `mandelbrot`（`libmandelbrot_explorer.so` / `mandelbrot_explorer.dll`）和 C 头文件
+`include/mandelbrot_explorer/mandelbrot_explorer.h`，可被任何支持 FFI 的语言调用（Python ctypes、C# P/Invoke、
 Rust、Go、Java Panama 等）；渲染核心不依赖 OpenCV。
 
 ```c
-#include "mandelbrot/mandelbrot.h"
+#include "mandelbrot_explorer/mandelbrot_explorer.h"
 
 mb_context* ctx = mb_create(1920, 1080, 2000, 0);      /* threads 0 = auto */
 mb_set_view(ctx, 4.0, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
@@ -135,10 +135,10 @@ mb_destroy(ctx);
 与 `mb_render_image(params, path, format)`（`mb_render_params` 需填 `struct_size`）。
 一个 context 持有自己的工作线程池，**不要跨线程并发调用同一个 context**（`mb_cancel` 例外）。
 
-视频导出在独立的 OpenCV 版共享库 `mandelbrot_video` 中（核心 `mandelbrot` 保持无依赖）：
+视频导出在独立的 OpenCV 版共享库 `mandelbrot_explorer_video` 中（核心 `mandelbrot_explorer` 保持无依赖）：
 
 ```c
-#include "mandelbrot/video.h"
+#include "mandelbrot_explorer/video.h"
 
 mb_video_params vp = {0};
 vp.struct_size = sizeof(vp);
@@ -151,13 +151,13 @@ mb_status status = mb_write_video(&vp, "zoom.mp4");   /* 无可用编码器时�
 Python 封装见 [`bindings/python`](bindings/python/README.md)（ctypes + numpy 零拷贝，无需编译）：
 
 ```python
-import mandelbrot
-with mandelbrot.Mandelbrot(1280, 720, max_iterations=1000) as m:
+import mandelbrot_explorer as me
+with me.Mandelbrot(1280, 720, max_iterations=1000) as m:
     m.set_view(2.0, -0.5, 0.0)
     colors, iterations = m.render(iterations=True)   # (h, w, 3) uint8 / (h, w) int32
 
-# 视频导出需要 OpenCV 版的 mandelbrot_video 库：
-mandelbrot.write_video("zoom.mp4", 1920, 1080, fps=60, duration=10, codec="h264")
+# 视频导出需要 OpenCV 版的 mandelbrot_explorer_video 库：
+me.write_video("zoom.mp4", 1920, 1080, fps=60, duration=10, codec="h264")
 ```
 
 ## 测试
@@ -178,7 +178,7 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 ## 架构简介
 - `Mandelbrot.cpp` – 共享框架（不依赖 OpenCV）：生命周期、坐标预计算、颜色表、调度、取消，
   以及渲染到调用者缓冲/迭代数组（`generate_frame`）。
-- `include/mandelbrot/mandelbrot.h` + `MandelbrotC.cpp` – C ABI 共享库：context 与一次性参数
+- `include/mandelbrot_explorer/mandelbrot_explorer.h` + `MandelbrotC.cpp` – C ABI 共享库：context 与一次性参数
   API、颜色（BGR/RGB）与 int32 迭代数组输出、BMP/PNM 写图、取消。
 - `MandelbrotOpenCV.h` – 可选的 OpenCV 适配（`generate_mat`/`generate_into_mat`）。
 - `MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` – 每架构的内层迭代内核。

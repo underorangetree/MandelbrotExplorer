@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mandelbrot/mandelbrot.h"
+#include "mandelbrot_explorer/mandelbrot_explorer.h"
 
 #define CHECK(condition)                                                                    \
     do {                                                                                    \

@@ -1,18 +1,18 @@
-/* C API for the Mandelbrot renderer.
+/* C API for MandelbrotExplorer.
  *
  * The library renders BGR8 frames. A context owns its own worker pool and is
  * not thread safe: use one context per thread and call into a given context
  * from a single thread at a time. Cancellation is the only exception and may be
  * requested from any thread.
  */
-#ifndef MANDELBROT_MANDELBROT_H
-#define MANDELBROT_MANDELBROT_H
+#ifndef MANDELBROT_EXPLORER_H
+#define MANDELBROT_EXPLORER_H
 
 #include <stddef.h>
 #include <stdint.h>
 
 #if defined(_WIN32)
-#  if defined(MANDELBROT_BUILD)
+#  if defined(MANDELBROT_EXPLORER_BUILD)
 #    define MB_API __declspec(dllexport)
 #  else
 #    define MB_API __declspec(dllimport)
@@ -142,4 +142,4 @@ MB_API mb_status mb_render_image(const mb_render_params* params, const char* pat
 } /* extern "C" */
 #endif
 
-#endif /* MANDELBROT_MANDELBROT_H */
+#endif /* MANDELBROT_EXPLORER_H */

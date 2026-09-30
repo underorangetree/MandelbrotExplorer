@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.23)
 cmake_policy(SET CMP0074 NEW)
 project(MandelbrotExplorer VERSION 0.5.0
         DESCRIPTION "A Mandelbrot set explorer using OpenCV"
@@ -16,7 +16,7 @@ endif()
 find_package(OpenCV REQUIRED COMPONENTS core videoio)
 find_package(Threads REQUIRED)
 
-add_library(mandelbrot_core STATIC
+add_library(mandelbrot_explorer_core STATIC
     src/CommandLine.cpp
     src/CommandLine.h
     src/ExitStatus.h
@@ -29,11 +29,11 @@ add_library(mandelbrot_core STATIC
     src/ThreadPool.cpp
     src/ThreadPool.h
 )
-target_include_directories(mandelbrot_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(mandelbrot_explorer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # The renderer core is OpenCV-free; only the app and the tests use OpenCV.
-target_link_libraries(mandelbrot_core PUBLIC Threads::Threads)
+target_link_libraries(mandelbrot_explorer_core PUBLIC Threads::Threads)
 # The core is linked into the shared C ABI library, so it must be position independent.
-set_target_properties(mandelbrot_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(mandelbrot_explorer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Keep every kernel on the exact operation sequence written in the source.
 # Otherwise GCC/Clang may contract a*b+c into an FMA in one kernel but not in
@@ -47,7 +47,7 @@ endif()
 # CPUs that lack the extension. select_kernel() dispatches at runtime.
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _mandelbrot_arch)
 if(_mandelbrot_arch MATCHES "x86_64|amd64|x64|i[3-6]86")
-    target_sources(mandelbrot_core PRIVATE
+    target_sources(mandelbrot_explorer_core PRIVATE
         src/MandelbrotKernel_avx2.cpp
         src/MandelbrotKernel_avx512.cpp)
     if(MSVC)
@@ -58,53 +58,53 @@ if(_mandelbrot_arch MATCHES "x86_64|amd64|x64|i[3-6]86")
         set_source_files_properties(src/MandelbrotKernel_avx512.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mfma;-ffp-contract=off")
     endif()
 elseif((_mandelbrot_arch MATCHES "aarch64|arm64") AND NOT MSVC)
-    target_sources(mandelbrot_core PRIVATE src/MandelbrotKernel_neon.cpp)
+    target_sources(mandelbrot_explorer_core PRIVATE src/MandelbrotKernel_neon.cpp)
     set_source_files_properties(src/MandelbrotKernel_neon.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 # Shared library with a C ABI, callable from other languages through FFI.
-add_library(mandelbrot SHARED
+add_library(mandelbrot_explorer SHARED
     src/MandelbrotC.cpp
-    include/mandelbrot/mandelbrot.h)
-target_link_libraries(mandelbrot PRIVATE mandelbrot_core)
-target_include_directories(mandelbrot PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_definitions(mandelbrot PRIVATE
-    MANDELBROT_BUILD
-    MANDELBROT_VERSION="${PROJECT_VERSION}")
-set_target_properties(mandelbrot PROPERTIES
+    include/mandelbrot_explorer/mandelbrot_explorer.h)
+target_link_libraries(mandelbrot_explorer PRIVATE mandelbrot_explorer_core)
+target_include_directories(mandelbrot_explorer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(mandelbrot_explorer PRIVATE
+    MANDELBROT_EXPLORER_BUILD
+    MANDELBROT_EXPLORER_VERSION="${PROJECT_VERSION}")
+set_target_properties(mandelbrot_explorer PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR})
 
 include(GNUInstallDirs)
-install(TARGETS mandelbrot
+install(TARGETS mandelbrot_explorer
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES include/mandelbrot/mandelbrot.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot)
+install(FILES include/mandelbrot_explorer/mandelbrot_explorer.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot_explorer)
 
 # Video export lives in a separate OpenCV-based library so the core C ABI stays
 # dependency-free.
-add_library(mandelbrot_video SHARED
+add_library(mandelbrot_explorer_video SHARED
     src/MandelbrotVideoC.cpp
-    include/mandelbrot/video.h)
-target_link_libraries(mandelbrot_video PRIVATE mandelbrot_core ${OpenCV_LIBS})
-target_include_directories(mandelbrot_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_definitions(mandelbrot_video PRIVATE MANDELBROT_VIDEO_BUILD)
-set_target_properties(mandelbrot_video PROPERTIES
+    include/mandelbrot_explorer/video.h)
+target_link_libraries(mandelbrot_explorer_video PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+target_include_directories(mandelbrot_explorer_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(mandelbrot_explorer_video PRIVATE MANDELBROT_EXPLORER_VIDEO_BUILD)
+set_target_properties(mandelbrot_explorer_video PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR})
-install(TARGETS mandelbrot_video
+install(TARGETS mandelbrot_explorer_video
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES include/mandelbrot/video.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot)
+install(FILES include/mandelbrot_explorer/video.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot_explorer)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_core ${OpenCV_LIBS})
+target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
 
-foreach(target mandelbrot_core mandelbrot mandelbrot_video ${PROJECT_NAME})
+foreach(target mandelbrot_explorer_core mandelbrot_explorer mandelbrot_explorer_video ${PROJECT_NAME})
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -129,19 +129,19 @@ endforeach()
 include(CTest)
 if(BUILD_TESTING)
     add_executable(mandelbrot_tests tests/mandelbrot_tests.cpp)
-    target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_core ${OpenCV_LIBS})
+    target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
     add_test(NAME unit COMMAND mandelbrot_tests)
 
     add_executable(mandelbrot_benchmark tests/benchmark.cpp)
-    target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_core ${OpenCV_LIBS})
+    target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
 
     add_executable(c_api_smoke tests/c_api_smoke.c)
-    target_link_libraries(c_api_smoke PRIVATE mandelbrot)
+    target_link_libraries(c_api_smoke PRIVATE mandelbrot_explorer)
     set_target_properties(c_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME c_api COMMAND c_api_smoke)
 
     add_executable(video_api_smoke tests/video_api_smoke.c)
-    target_link_libraries(video_api_smoke PRIVATE mandelbrot_video)
+    target_link_libraries(video_api_smoke PRIVATE mandelbrot_explorer_video)
     set_target_properties(video_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME video_api COMMAND video_api_smoke)
     # Exit code 3 = no usable video backend: skipped.
@@ -152,7 +152,7 @@ if(BUILD_TESTING)
     if(Python3_Interpreter_FOUND)
         add_test(NAME python_binding
                  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/selftest.py
-                         --library $<TARGET_FILE:mandelbrot>)
+                         --library $<TARGET_FILE:mandelbrot_explorer>)
         set_tests_properties(python_binding PROPERTIES SKIP_RETURN_CODE 3)
     endif()
 

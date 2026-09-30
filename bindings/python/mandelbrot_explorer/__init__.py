@@ -1,25 +1,25 @@
 """Python binding for the MandelbrotExplorer C ABI.
 
 The binding is a thin, dependency-light wrapper around the shared library
-(``mandelbrot.dll`` / ``libmandelbrot.so`` / ``libmandelbrot.dylib``) and only
+(``mandelbrot_explorer.dll`` / ``libmandelbrot_explorer.so`` / ``libmandelbrot_explorer.dylib``) and only
 needs numpy for the array helpers (``render``/``render_into``). Rendering is
 zero-copy: the library writes straight into numpy buffers, and the returned
 arrays are views cropped to the requested width.
 
 Typical use::
 
-    import mandelbrot
+    import mandelbrot_explorer as me
 
-    with mandelbrot.Mandelbrot(1280, 720, max_iterations=1000) as m:
+    with me.Mandelbrot(1280, 720, max_iterations=1000) as m:
         m.set_view(4.0, -0.743643887037158704752191506114774,
                    0.131825904205311970493132056385139)
         colors, iterations = m.render(colors=True, iterations=True)
 
 The library is located through ``load_library(path)``, the
-``MANDELBROT_LIBRARY`` environment variable, the package directory, the
+``MANDELBROT_EXPLORER_LIBRARY`` environment variable, the package directory, the
 repository build tree or the system search path, in that order. Video export
-(``write_video``) uses the optional OpenCV-based ``mandelbrot_video`` library,
-located the same way through ``load_video_library``/``MANDELBROT_VIDEO_LIBRARY``.
+(``write_video``) uses the optional OpenCV-based ``mandelbrot_explorer_video`` library,
+located the same way through ``load_video_library``/``MANDELBROT_EXPLORER_VIDEO_LIBRARY``.
 """
 
 from __future__ import annotations
@@ -64,14 +64,14 @@ _STATUS_NAMES = {
 _PIXEL_ORDERS = {"bgr": 0, "rgb": 1}
 _IMAGE_FORMATS = {"bmp": 0, "pnm": 1, "ppm": 1}
 
-_CORE_LIBRARY_NAMES = ("mandelbrot.dll", "libmandelbrot.so", "libmandelbrot.dylib")
-_CORE_PATTERNS = ("build/*/Release/mandelbrot.dll", "build/*/mandelbrot.dll",
-                  "build/*/libmandelbrot.so*", "build/libmandelbrot.so*",
-                  "build/*/libmandelbrot.dylib")
-_VIDEO_LIBRARY_NAMES = ("mandelbrot_video.dll", "libmandelbrot_video.so", "libmandelbrot_video.dylib")
-_VIDEO_PATTERNS = ("build/*/Release/mandelbrot_video.dll", "build/*/mandelbrot_video.dll",
-                   "build/*/libmandelbrot_video.so*", "build/libmandelbrot_video.so*",
-                   "build/*/libmandelbrot_video.dylib")
+_CORE_LIBRARY_NAMES = ("mandelbrot_explorer.dll", "libmandelbrot_explorer.so", "libmandelbrot_explorer.dylib")
+_CORE_PATTERNS = ("build/*/Release/mandelbrot_explorer.dll", "build/*/mandelbrot_explorer.dll",
+                  "build/*/libmandelbrot_explorer.so*", "build/libmandelbrot_explorer.so*",
+                  "build/*/libmandelbrot_explorer.dylib")
+_VIDEO_LIBRARY_NAMES = ("mandelbrot_explorer_video.dll", "libmandelbrot_explorer_video.so", "libmandelbrot_explorer_video.dylib")
+_VIDEO_PATTERNS = ("build/*/Release/mandelbrot_explorer_video.dll", "build/*/mandelbrot_explorer_video.dll",
+                   "build/*/libmandelbrot_explorer_video.so*", "build/libmandelbrot_explorer_video.so*",
+                   "build/*/libmandelbrot_explorer_video.dylib")
 
 
 class MandelbrotError(RuntimeError):
@@ -123,7 +123,7 @@ def _search_candidates(explicit: str | None, env_var: str,
 def load_library(path: str | None = None) -> str:
     """Loads the shared library (once) and returns its resolved path.
 
-    Pass ``path`` to override the search; otherwise the ``MANDELBROT_LIBRARY``
+    Pass ``path`` to override the search; otherwise the ``MANDELBROT_EXPLORER_LIBRARY``
     environment variable, the package directory, the repository build tree and
     the system search path are tried in order.
     """
@@ -131,7 +131,7 @@ def load_library(path: str | None = None) -> str:
     if _library is not None:
         if path is None or Path(path).resolve() == Path(_library_path or "").resolve():
             return _library_path or ""
-    candidates = _search_candidates(path, "MANDELBROT_LIBRARY", _CORE_LIBRARY_NAMES, _CORE_PATTERNS)
+    candidates = _search_candidates(path, "MANDELBROT_EXPLORER_LIBRARY", _CORE_LIBRARY_NAMES, _CORE_PATTERNS)
     errors: list[str] = []
     for candidate in candidates:
         if candidate in _CORE_LIBRARY_NAMES or Path(candidate).exists():
@@ -145,8 +145,8 @@ def load_library(path: str | None = None) -> str:
             _library_path = candidate
             return candidate
     raise FileNotFoundError(
-        "could not locate the mandelbrot shared library; build the `mandelbrot` "
-        "target or set MANDELBROT_LIBRARY. Tried: " + ", ".join(candidates)
+        "could not locate the mandelbrot_explorer shared library; build the `mandelbrot` "
+        "target or set MANDELBROT_EXPLORER_LIBRARY. Tried: " + ", ".join(candidates)
         + (("; errors: " + "; ".join(errors)) if errors else "")
     )
 
@@ -221,17 +221,17 @@ _video_library_path: str | None = None
 
 
 def load_video_library(path: str | None = None) -> str:
-    """Loads the optional OpenCV-based ``mandelbrot_video`` shared library.
+    """Loads the optional OpenCV-based ``mandelbrot_explorer_video`` shared library.
 
     Needed by :func:`write_video`; searches the same places as
-    :func:`load_library`, with ``MANDELBROT_VIDEO_LIBRARY`` as the override.
+    :func:`load_library`, with ``MANDELBROT_EXPLORER_VIDEO_LIBRARY`` as the override.
     Raises :class:`FileNotFoundError` when the library is not built.
     """
     global _video_library, _video_library_path
     if _video_library is not None:
         if path is None or Path(path).resolve() == Path(_video_library_path or "").resolve():
             return _video_library_path or ""
-    candidates = _search_candidates(path, "MANDELBROT_VIDEO_LIBRARY",
+    candidates = _search_candidates(path, "MANDELBROT_EXPLORER_VIDEO_LIBRARY",
                                     _VIDEO_LIBRARY_NAMES, _VIDEO_PATTERNS)
     errors: list[str] = []
     for candidate in candidates:
@@ -248,8 +248,8 @@ def load_video_library(path: str | None = None) -> str:
             _video_library_path = candidate
             return candidate
     raise FileNotFoundError(
-        "could not locate the mandelbrot_video shared library; build the "
-        "`mandelbrot_video` target or set MANDELBROT_VIDEO_LIBRARY. Tried: "
+        "could not locate the mandelbrot_explorer_video shared library; build the "
+        "`mandelbrot_explorer_video` target or set MANDELBROT_EXPLORER_VIDEO_LIBRARY. Tried: "
         + ", ".join(candidates)
         + (("; errors: " + "; ".join(errors)) if errors else "")
     )
@@ -497,7 +497,7 @@ def write_video(path: str, width: int = 1920, height: int = 1080, *, max_iterati
                 library: str | None = None) -> None:
     """Renders the application's zoom animation and writes it to ``path``.
 
-    Needs the optional OpenCV-based ``mandelbrot_video`` library. Raises
+    Needs the optional OpenCV-based ``mandelbrot_explorer_video`` library. Raises
     :class:`VideoError` when no usable encoder is available, and
     :class:`FileNotFoundError` when the library itself is not built.
     """

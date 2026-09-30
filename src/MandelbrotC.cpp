@@ -1,7 +1,7 @@
-#ifndef MANDELBROT_BUILD
-#define MANDELBROT_BUILD
+#ifndef MANDELBROT_EXPLORER_BUILD
+#define MANDELBROT_EXPLORER_BUILD
 #endif
-#include "mandelbrot/mandelbrot.h"
+#include "mandelbrot_explorer/mandelbrot_explorer.h"
 #include <cmath>
 #include <exception>
 #include <fstream>
@@ -11,8 +11,8 @@
 #include <vector>
 #include "Mandelbrot.h"
 
-#ifndef MANDELBROT_VERSION
-#define MANDELBROT_VERSION "unknown"
+#ifndef MANDELBROT_EXPLORER_VERSION
+#define MANDELBROT_EXPLORER_VERSION "unknown"
 #endif
 
 struct mb_context {
@@ -168,7 +168,7 @@ auto require_params(const mb_render_params* params) -> bool {
 extern "C" {
 
 const char* mb_version(void) {
-    return MANDELBROT_VERSION;
+    return MANDELBROT_EXPLORER_VERSION;
 }
 
 const char* mb_last_error(void) {
