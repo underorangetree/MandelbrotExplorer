@@ -17,7 +17,7 @@
       CLI `--version` 自动跟随）
 - [ ] 发布说明（GitHub Release 描述或 `CHANGELOG.md`）：新库、改名（库名/头路径/环境变量）、
       性能改造，并注明 0.x 期间 C ABI 仍可能变动
-- [ ] README 修正：`共享库 mandelbrot` -> `mandelbrot_explorer`；动画曲线位置改为 `src/ViewSequence.h`
+- [x] README 修正：`共享库 mandelbrot` -> `mandelbrot_explorer`；动画曲线位置改为 `src/ViewSequence.h`
 - [x] CLI `-v/--version`
 
 ## 0.7 - 0.9 - 1.0 前置
@@ -50,9 +50,9 @@
 
 ### 文档
 
-- [ ] `CHANGELOG.md`
+- [x] `CHANGELOG.md`
 - [ ] README 平台支持矩阵与已知限制
-- [ ] （可选）`docs/` 下的 C ABI 使用教程
+- [x] `docs/` 下的 C ABI 使用教程（`docs/c-api.md`）
 
 ## 1.0 完成标准
 

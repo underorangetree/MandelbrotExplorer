@@ -1,0 +1,50 @@
+# 更新日志
+
+本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)；变更记录格式参考
+[Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
+
+## [Unreleased]（计划为 0.6.0）
+
+### 新增
+
+- C ABI 共享库 `mandelbrot_explorer`（`include/mandelbrot_explorer/mandelbrot_explorer.h`）：
+  不透明 context 与一次性参数 API、BGR/RGB 颜色输出、int32 迭代数组输出、无外部依赖的
+  BMP/PNM 写图、渲染取消；渲染核心不再依赖 OpenCV。
+- 视频导出 API `mandelbrot_explorer_video`（`include/mandelbrot_explorer/video.h` 的
+  `mb_write_video`），与 CLI 共用动画曲线（`src/ViewSequence.h`）与编码器名称映射
+  （`src/VideoCodec.h`）。
+- Python 绑定（`bindings/python`）：ctypes + numpy 零拷贝，支持颜色/迭代输出、写图与视频导出，
+  无需编译。
+- CLI 新选项：`--threads`、`--kernel`（新增 AVX-512 内核可选）、`--codec`、`--quality`、
+  `-v/--version`。
+- AVX-512 内核；NEON 内核与 AVX2 的结构和语义对齐。
+- RelWithDebInfo 构建预设（优化 + 调试符号）。
+- 文档：C ABI 使用教程（`docs/c-api.md`）、路线图（`ROADMAP.md`）、更新日志（本文件）。
+
+### 变更
+
+- 库、CMake 目标、头文件路径与环境变量统一改名为 `mandelbrot_explorer` /
+  `mandelbrot_explorer_video`；C 导出符号（`mb_*`）与导出宏不变。
+- 渲染与编码改为“帧缓冲池 + 写出线程”的生产-消费流水线，编码与渲染重叠执行。
+- AVX2 内核重写：携带平方量、去掉累计掩码，避免寄存器溢出到栈。
+- AVX-512 内核重写为双链结构。
+- 头文件包含整理（补齐直接依赖、排序、架构守卫）。
+- CI 权限最小化（`permissions: contents: read`）。
+
+### 修复
+
+- 修复 AVX-512 内核在边界像素上与标量参考不一致的舍入问题。
+- 修复小尺寸视频渲染测试被误跳过的问题，并加强内核一致性测试（同时比较迭代数组）。
+- 补齐错误路径与边界测试：行覆盖率 84% -> 92%（gcovr，Linux x64）。
+
+## [0.5.0] - 2026-09-26
+
+### 新增
+
+- 首个正式发布：命令行视频生成器。
+- 运行时分派的 SIMD 内核（标量 / AVX2 / NEON），多线程渲染（线程池 + 按行原子任务窃取），
+  黑体辐射颜色映射，MP4 导出与平滑缩放动画。
+- 参数校验与 `--help`；macOS（Homebrew）构建支持。
+
+[Unreleased]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/UnderOrangeTree/MandelbrotExplorer/releases/tag/v0.5.0

@@ -107,12 +107,13 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 编码器是否可用取决于 OpenCV 的构建（FFmpeg 后端）；打不开时会报错退出，
 `--quality` 不被某编码器支持时打印警告并继续。
 
-缩放动画曲线与目标中心点仍硬编码在 `main.cpp` 中。
+缩放动画曲线与目标中心点仍硬编码在 `src/ViewSequence.h` 中。
 
 ## 作为库使用（C ABI）
-构建后会生成共享库 `mandelbrot`（`libmandelbrot_explorer.so` / `mandelbrot_explorer.dll`）和 C 头文件
+构建后会生成共享库 `mandelbrot_explorer`（`libmandelbrot_explorer.so` / `mandelbrot_explorer.dll`）和 C 头文件
 `include/mandelbrot_explorer/mandelbrot_explorer.h`，可被任何支持 FFI 的语言调用（Python ctypes、C# P/Invoke、
-Rust、Go、Java Panama 等）；渲染核心不依赖 OpenCV。
+Rust、Go、Java Panama 等）；渲染核心不依赖 OpenCV。完整的构建、概念、错误处理与其他语言调用教程见
+[docs/c-api.md](docs/c-api.md)。
 
 ```c
 #include "mandelbrot_explorer/mandelbrot_explorer.h"
@@ -191,3 +192,5 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 本项目基于 [MIT 许可证](LICENSE) 发布。
 
 第三方依赖：[OpenCV](https://opencv.org/)（Apache-2.0 许可证），发布二进制时请一并保留其许可声明。
+
+变更记录见 [CHANGELOG.md](CHANGELOG.md)，通往 1.0 的计划见 [ROADMAP.md](ROADMAP.md)。

@@ -79,4 +79,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 
 ## Docs
 - `README.md` is user-facing; keep it in sync when CLI behavior changes.
+- `docs/c-api.md` - C ABI tutorial (Chinese, user-facing); keep it in sync with the headers.
+- `CHANGELOG.md` - user-facing release notes (Keep a Changelog); add entries when releasing.
+- `ROADMAP.md` - the plan to 1.0.
 - `LICENSE` - MIT.
