@@ -15,6 +15,7 @@ void render_row_avx2(const RowContext& context) {
     const int max_iterations = context.max_iterations;
     const std::array<uint8_t, 3>* const color_map = context.color_map;
     uint8_t* const row_ptr = context.row_ptr;
+    std::int32_t* const iteration_out = context.iterations;
     const double* const r_data = context.r_data;
     alignas(32) int64_t iterations_a[simd_size];
     alignas(32) int64_t iterations_b[simd_size];
@@ -88,19 +89,27 @@ void render_row_avx2(const RowContext& context) {
         }
         _mm256_store_si256(reinterpret_cast<__m256i*>(iterations_a), iteration_vec_a);
         _mm256_store_si256(reinterpret_cast<__m256i*>(iterations_b), iteration_vec_b);
-        for (int dx = 0; dx < simd_size; ++dx) {
-            uint8_t* const pixel_ptr = row_ptr + (x + dx) * 3;
-            uint64_t iter = iterations_a[dx];
-            pixel_ptr[0] = color_map[iter][0];
-            pixel_ptr[1] = color_map[iter][1];
-            pixel_ptr[2] = color_map[iter][2];
+        if (iteration_out != nullptr) {
+            for (int dx = 0; dx < simd_size; ++dx) {
+                iteration_out[x + dx] = static_cast<std::int32_t>(iterations_a[dx]);
+                iteration_out[x + simd_size + dx] = static_cast<std::int32_t>(iterations_b[dx]);
+            }
         }
-        for (int dx = 0; dx < simd_size; ++dx) {
-            uint8_t* const pixel_ptr = row_ptr + (x + simd_size + dx) * 3;
-            uint64_t iter = iterations_b[dx];
-            pixel_ptr[0] = color_map[iter][0];
-            pixel_ptr[1] = color_map[iter][1];
-            pixel_ptr[2] = color_map[iter][2];
+        if (row_ptr != nullptr) {
+            for (int dx = 0; dx < simd_size; ++dx) {
+                uint8_t* const pixel_ptr = row_ptr + (x + dx) * 3;
+                uint64_t iter = iterations_a[dx];
+                pixel_ptr[0] = color_map[iter][0];
+                pixel_ptr[1] = color_map[iter][1];
+                pixel_ptr[2] = color_map[iter][2];
+            }
+            for (int dx = 0; dx < simd_size; ++dx) {
+                uint8_t* const pixel_ptr = row_ptr + (x + simd_size + dx) * 3;
+                uint64_t iter = iterations_b[dx];
+                pixel_ptr[0] = color_map[iter][0];
+                pixel_ptr[1] = color_map[iter][1];
+                pixel_ptr[2] = color_map[iter][2];
+            }
         }
     }
 }

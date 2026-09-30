@@ -53,6 +53,81 @@ int main(void) {
 
     CHECK(mb_render_into(ctx, NULL, stride) == MB_INVALID_ARGUMENT);
 
+    /* Iteration counts: the view center is (0,0), which is inside the set. */
+    const size_t iteration_stride = (size_t)mb_width(ctx) * sizeof(int32_t);
+    int32_t* iterations = (int32_t*)malloc((size_t)mb_height(ctx) * iteration_stride);
+    CHECK(iterations != NULL);
+    CHECK(mb_render_outputs(ctx, NULL, 0, iterations, iteration_stride) == MB_OK);
+    CHECK(iterations[(mb_height(ctx) / 2) * mb_width(ctx) + mb_width(ctx) / 2] == 64);
+
+    /* Colors and iterations together match the single-output renders. */
+    unsigned char* both_colors = (unsigned char*)malloc((size_t)mb_height(ctx) * stride);
+    int32_t* both_iterations = (int32_t*)malloc((size_t)mb_height(ctx) * iteration_stride);
+    CHECK(both_colors != NULL && both_iterations != NULL);
+    CHECK(mb_render_outputs(ctx, both_colors, stride, both_iterations, iteration_stride) == MB_OK);
+    CHECK(memcmp(frame, both_colors, (size_t)mb_height(ctx) * stride) == 0);
+    CHECK(memcmp(iterations, both_iterations, (size_t)mb_height(ctx) * iteration_stride) == 0);
+    CHECK(mb_render_outputs(ctx, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+    free(both_iterations);
+    free(both_colors);
+
+    /* RGB output swaps the red and blue channels of the BGR render. */
+    CHECK(mb_set_pixel_order(ctx, MB_RGB) == MB_OK);
+    unsigned char* rgb = (unsigned char*)malloc((size_t)mb_height(ctx) * stride);
+    CHECK(rgb != NULL);
+    CHECK(mb_render_into(ctx, rgb, stride) == MB_OK);
+    for (size_t i = 0; i + 2 < (size_t)mb_height(ctx) * stride; i += 3) {
+        CHECK(rgb[i] == frame[i + 2] && rgb[i + 1] == frame[i + 1] && rgb[i + 2] == frame[i]);
+    }
+    CHECK(mb_set_pixel_order(ctx, MB_BGR) == MB_OK);
+    free(rgb);
+
+    /* Image files (dependency-free BMP / PNM writers). */
+    CHECK(mb_write_image(ctx, "c_api_smoke.bmp", MB_IMAGE_BMP) == MB_OK);
+    CHECK(mb_write_image(ctx, "c_api_smoke.ppm", MB_IMAGE_PNM) == MB_OK);
+    {
+        unsigned char magic[2] = {0, 0};
+        FILE* file = fopen("c_api_smoke.bmp", "rb");
+        CHECK(file != NULL);
+        CHECK(fread(magic, 1, 2, file) == 2);
+        fclose(file);
+        CHECK(magic[0] == 'B' && magic[1] == 'M');
+        file = fopen("c_api_smoke.ppm", "rb");
+        CHECK(file != NULL);
+        CHECK(fread(magic, 1, 2, file) == 2);
+        fclose(file);
+        CHECK(magic[0] == 'P' && magic[1] == '6');
+        remove("c_api_smoke.bmp");
+        remove("c_api_smoke.ppm");
+    }
+
+    /* One-shot parameter API matches the context-based render. */
+    {
+        mb_render_params params;
+        memset(&params, 0, sizeof(params));
+        params.struct_size = sizeof(params);
+        params.width = 64;
+        params.height = 32;
+        params.max_iterations = 64;
+        params.threads = 2;
+        params.zoom = 1.0;
+        params.center_x = -0.5;
+        params.center_y = 0.0;
+        params.kernel = "scalar";
+        params.pixel_order = MB_BGR;
+        unsigned char* one_shot = (unsigned char*)malloc((size_t)32 * stride);
+        CHECK(one_shot != NULL);
+        CHECK(mb_render_frame(&params, one_shot, stride, NULL, 0) == MB_OK);
+        CHECK(memcmp(frame, one_shot, (size_t)32 * stride) == 0);
+        free(one_shot);
+        CHECK(mb_render_image(&params, "c_api_smoke_oneshot.bmp", MB_IMAGE_BMP) == MB_OK);
+        remove("c_api_smoke_oneshot.bmp");
+
+        params.struct_size = 0;
+        CHECK(mb_render_frame(&params, NULL, 0, NULL, 0) == MB_INVALID_ARGUMENT);
+    }
+
+    free(iterations);
     mb_destroy(ctx);
     mb_destroy(NULL);
 

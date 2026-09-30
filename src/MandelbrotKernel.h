@@ -1,14 +1,15 @@
 #pragma once
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 // Everything a kernel needs to render one row of the image. The framework
-// prepares this (coordinates, output pointer, color map) and the per-architecture
+// prepares this (coordinates, output pointers, color map) and the per-architecture
 // kernel only owns the escape-time inner loop.
 struct RowContext {
     const double* r_data;                     // real parts, indexed by column
     double ci;                                // imaginary part of this row
-    uint8_t* row_ptr;                         // start of the output row (3 bytes per pixel)
+    uint8_t* row_ptr;                         // start of the color output row (3 bytes per pixel)
     // x_begin and x_end must be a multiple of the kernel's block size: 16 for
     // AVX-512 (two 8-wide chains), 8 for AVX2, 4 for NEON, any value for the
     // scalar kernel. The framework pads the width to 32 and always renders
@@ -17,6 +18,11 @@ struct RowContext {
     int x_end;                                // one past the last column of the tile
     int max_iterations;
     const std::array<uint8_t, 3>* color_map;  // length = max_iterations + 1
+    // Optional iteration counts output (int32 per pixel, contiguous within the
+    // row). At least one of row_ptr and iterations must be non-null; color_map
+    // and row_ptr may be null when only the counts are requested.
+    std::int32_t* iterations = nullptr;
+    std::size_t iterations_step = 0;          // row stride in bytes, unused inside a row
 };
 
 using RowKernel = void (*)(const RowContext&);

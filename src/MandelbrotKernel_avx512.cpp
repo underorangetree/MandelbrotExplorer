@@ -14,6 +14,7 @@ void render_row_avx512(const RowContext& context) {
     const int max_iterations = context.max_iterations;
     const std::array<uint8_t, 3>* const color_map = context.color_map;
     uint8_t* const row_ptr = context.row_ptr;
+    std::int32_t* const iteration_out = context.iterations;
     const double* const r_data = context.r_data;
     alignas(64) int64_t iterations[chain_count][simd_size];
     const __m512d y_vec = _mm512_set1_pd(context.ci);
@@ -88,13 +89,22 @@ void render_row_avx512(const RowContext& context) {
         }
         _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[0]), iteration_vec_0);
         _mm512_store_si512(reinterpret_cast<__m512i*>(iterations[1]), iteration_vec_1);
-        for (int c = 0; c < chain_count; ++c) {
-            for (int d = 0; d < simd_size; ++d) {
-                uint8_t* const pixel_ptr = row_ptr + (x + c * simd_size + d) * 3;
-                const uint64_t iter = static_cast<uint64_t>(iterations[c][d]);
-                pixel_ptr[0] = color_map[iter][0];
-                pixel_ptr[1] = color_map[iter][1];
-                pixel_ptr[2] = color_map[iter][2];
+        if (iteration_out != nullptr) {
+            for (int c = 0; c < chain_count; ++c) {
+                for (int d = 0; d < simd_size; ++d) {
+                    iteration_out[x + c * simd_size + d] = static_cast<std::int32_t>(iterations[c][d]);
+                }
+            }
+        }
+        if (row_ptr != nullptr) {
+            for (int c = 0; c < chain_count; ++c) {
+                for (int d = 0; d < simd_size; ++d) {
+                    uint8_t* const pixel_ptr = row_ptr + (x + c * simd_size + d) * 3;
+                    const uint64_t iter = static_cast<uint64_t>(iterations[c][d]);
+                    pixel_ptr[0] = color_map[iter][0];
+                    pixel_ptr[1] = color_map[iter][1];
+                    pixel_ptr[2] = color_map[iter][2];
+                }
             }
         }
     }

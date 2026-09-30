@@ -13,6 +13,17 @@ public:
     // Work-splitting strategy. Tiled is the default; PerRow reproduces the old
     // one-task-per-row scheme and exists for benchmarking.
     enum class Schedule : std::uint8_t { Tiled, PerRow };
+    // Channel order of the rendered color frames. Bgr matches OpenCV/FFmpeg,
+    // Rgb matches numpy/PIL conventions.
+    enum class PixelOrder : std::uint8_t { Bgr, Rgb };
+    // Outputs of one render. At least one of bgr/iterations must be set; the
+    // strides are in bytes and must cover one row (storage_width() pixels).
+    struct FrameTargets {
+        uint8_t* bgr = nullptr;
+        std::size_t bgr_stride = 0;
+        std::int32_t* iterations = nullptr;
+        std::size_t iterations_stride = 0;
+    };
 private:
     struct AlignedDelete {
         void operator()(double* ptr) const noexcept {
@@ -31,10 +42,13 @@ private:
     std::unique_ptr<double, AlignedDelete> r_data;
     std::unique_ptr<double, AlignedDelete> i_data;
     ThreadPool thread_pool;
-    std::vector<uint8_t> image; // height x width x 3, BGR
-    uint8_t* output_data_ = nullptr;
-    std::size_t output_step_ = 0;
+    std::vector<uint8_t> image; // height x width x 3, in pixel_order_
+    uint8_t* color_output_ = nullptr;
+    std::size_t color_step_ = 0;
+    uint8_t* iteration_output_ = nullptr;
+    std::size_t iteration_step_ = 0;
     std::atomic<bool> cancel_requested_{false};
+    PixelOrder pixel_order_ = PixelOrder::Bgr;
     RowKernel kernel_ = nullptr;
     const char* kernel_name_ = "unknown";
     Schedule schedule_ = Schedule::Tiled;
@@ -63,7 +77,12 @@ public:
     }
 private:
     void render_tile(int row_index, int x_begin, int x_end);
+    void rebuild_color_map();
 public:
+    // Rebuilds the color map in the requested channel order; affects subsequent
+    // renders only.
+    void set_pixel_order(PixelOrder order);
+    [[nodiscard]] auto pixel_order() const -> PixelOrder { return pixel_order_; }
     [[nodiscard]] auto frame_width() const -> int { return requested_width; }
     [[nodiscard]] auto frame_height() const -> int { return height; }
     // Padded width of the storage a frame must provide: the kernels render whole
@@ -75,9 +94,11 @@ public:
     [[nodiscard]] auto generate() -> const uint8_t*;
     // First pixel of the last rendered frame (internal buffer).
     [[nodiscard]] auto frame_data() const -> const uint8_t* { return image.data(); }
-    // Renders into a caller-owned BGR8 buffer instead of the internal one, so
-    // several frames can be in flight without copying. `stride` is in bytes and
-    // must be at least `storage_width() * 3`; the caller must keep the buffer
-    // untouched until the call returns.
+    // Renders into the internal buffer, colors only.
     auto generate_into(uint8_t* buffer, std::size_t stride) -> void;
+    // Renders into the requested outputs instead of the internal buffer, so
+    // several frames can be in flight without copying and the iteration counts
+    // can be captured. The caller must keep the buffers untouched until the
+    // call returns.
+    auto generate_frame(const FrameTargets& targets) -> void;
 };

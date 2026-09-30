@@ -336,6 +336,44 @@ void test_generate_into() {
     CHECK(threw);
 }
 
+// generate_frame() can capture the iteration counts, together with or instead
+// of the colors, and set_pixel_order() swaps the red and blue channels.
+void test_iterations_and_pixel_order() {
+    constexpr int width = 32;
+    constexpr int height = 32;
+    Mandelbrot mandelbrot(width, height, 64);
+    mandelbrot.setView(1.0, 0.0, 0.0);
+
+    std::vector<std::int32_t> iterations(width * height);
+    mandelbrot.generate_frame({.iterations=iterations.data(),
+                               .iterations_stride=width * static_cast<std::size_t>(sizeof(std::int32_t))});
+    CHECK(iterations[16 * width + 16] == 64); // (0,0) is in the set
+    CHECK(iterations[0] < 64);                // the corner escapes
+
+    std::vector<std::uint8_t> colors_only(width * height * 3);
+    mandelbrot.generate_frame({.bgr=colors_only.data(), .bgr_stride=width * 3});
+    std::vector<std::uint8_t> colors_both(width * height * 3);
+    std::vector<std::int32_t> iterations_both(width * height);
+    mandelbrot.generate_frame({.bgr=colors_both.data(),
+                               .bgr_stride=width * 3,
+                               .iterations=iterations_both.data(),
+                               .iterations_stride=width * static_cast<std::size_t>(sizeof(std::int32_t))});
+    CHECK(colors_both == colors_only);
+    CHECK(iterations_both == iterations);
+
+    std::vector<std::uint8_t> rgb(width * height * 3);
+    mandelbrot.set_pixel_order(Mandelbrot::PixelOrder::Rgb);
+    CHECK(mandelbrot.pixel_order() == Mandelbrot::PixelOrder::Rgb);
+    mandelbrot.generate_frame({.bgr=rgb.data(), .bgr_stride=width * 3});
+    bool swapped = true;
+    for (std::size_t i = 0; i < rgb.size(); i += 3) {
+        swapped = swapped && rgb[i] == colors_only[i + 2] &&
+                  rgb[i + 1] == colors_only[i + 1] &&
+                  rgb[i + 2] == colors_only[i];
+    }
+    CHECK(swapped);
+}
+
 // Regression: GCC/Clang may contract a*b+c into an FMA in one kernel but not in
 // another, which changes the rounding of a few boundary pixels. These rows come
 // from the default 1280x720 view at zoom 1.0 and contain pixels that diverge
@@ -462,6 +500,7 @@ auto main() -> int {
     test_kernel_matches_scalar();
     test_forced_kernel_rendering();
     test_generate_into();
+    test_iterations_and_pixel_order();
     test_kernel_rounding_ties();
     test_mandelbrot_constructor_validation();
     return 0;

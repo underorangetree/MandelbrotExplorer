@@ -9,6 +9,7 @@
 #define MANDELBROT_MANDELBROT_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32)
 #  if defined(MANDELBROT_BUILD)
@@ -32,6 +33,18 @@ typedef enum mb_status {
     MB_INTERNAL_ERROR = 2,
     MB_CANCELLED = 3
 } mb_status;
+
+/* Channel order of the rendered color frames. BGR matches OpenCV/FFmpeg,
+ * RGB matches numpy/PIL conventions. */
+typedef enum mb_pixel_order {
+    MB_BGR = 0,
+    MB_RGB = 1
+} mb_pixel_order;
+
+typedef enum mb_image_format {
+    MB_IMAGE_BMP = 0,
+    MB_IMAGE_PNM = 1
+} mb_image_format;
 
 /* Library version, e.g. "0.5.0". Never NULL. */
 MB_API const char* mb_version(void);
@@ -69,6 +82,10 @@ MB_API mb_status mb_set_view(mb_context* ctx, double zoom, double center_x, doub
  * when the name is unknown or the CPU does not support it. */
 MB_API mb_status mb_set_kernel(mb_context* ctx, const char* name);
 
+/* Rebuilds the color map in the requested channel order; affects subsequent
+ * renders only. */
+MB_API mb_status mb_set_pixel_order(mb_context* ctx, mb_pixel_order order);
+
 /* Renders into the internal buffer. mb_frame_data() then points to
  * `height` rows of BGR8 pixels with stride 3 * mb_storage_width(); only the
  * first mb_width() columns are meaningful. The pointer stays valid until the
@@ -81,10 +98,44 @@ MB_API const unsigned char* mb_frame_data(const mb_context* ctx);
  * returns. */
 MB_API mb_status mb_render_into(mb_context* ctx, unsigned char* bgr, size_t stride);
 
+/* Renders into the requested outputs: colors (bgr, stride in bytes) and/or
+ * per-pixel iteration counts (int32, stride in bytes). At least one output must
+ * be set; the buffers must stay untouched until the call returns. */
+MB_API mb_status mb_render_outputs(mb_context* ctx,
+                                   unsigned char* bgr, size_t bgr_stride,
+                                   int32_t* iterations, size_t iterations_stride);
+
+/* Renders the current view and writes it to `path` as BMP or PNM (P6). */
+MB_API mb_status mb_write_image(mb_context* ctx, const char* path, mb_image_format format);
+
 /* Requests cancellation of a render in progress; the render call returns
  * MB_CANCELLED with a partially rendered frame. The flag is sticky and is
  * cleared at the beginning of the next render. Thread-safe. */
 MB_API void mb_cancel(mb_context* ctx);
+
+/* One-shot render parameters. Set struct_size to sizeof(mb_render_params) so
+ * future fields can be added safely. The context-based API is a better fit for
+ * animation sequences (it keeps the worker pool alive). */
+typedef struct mb_render_params {
+    size_t struct_size;
+    int width;
+    int height;
+    int max_iterations;
+    int threads;              /* 0 = auto */
+    double zoom;
+    double center_x;
+    double center_y;
+    const char* kernel;       /* NULL = auto */
+    mb_pixel_order pixel_order;
+} mb_render_params;
+
+/* Renders one frame with the given parameters into the outputs. */
+MB_API mb_status mb_render_frame(const mb_render_params* params,
+                                 unsigned char* bgr, size_t bgr_stride,
+                                 int32_t* iterations, size_t iterations_stride);
+
+/* Renders one frame with the given parameters and writes it to `path`. */
+MB_API mb_status mb_render_image(const mb_render_params* params, const char* path, mb_image_format format);
 
 #ifdef __cplusplus
 } /* extern "C" */

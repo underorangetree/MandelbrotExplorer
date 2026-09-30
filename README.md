@@ -108,6 +108,33 @@ MandelbrotExplorer -s 1280x720 --maxiter 1000 --fps 30 --duration 5 -o zoom.mp4
 
 缩放动画曲线与目标中心点仍硬编码在 `main.cpp` 中。
 
+## 作为库使用（C ABI）
+构建后会生成共享库 `mandelbrot`（`libmandelbrot.so` / `mandelbrot.dll`）和 C 头文件
+`include/mandelbrot/mandelbrot.h`，可被任何支持 FFI 的语言调用（Python ctypes、C# P/Invoke、
+Rust、Go、Java Panama 等）；渲染核心不依赖 OpenCV。
+
+```c
+#include "mandelbrot/mandelbrot.h"
+
+mb_context* ctx = mb_create(1920, 1080, 2000, 0);      /* threads 0 = auto */
+mb_set_view(ctx, 4.0, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
+mb_set_pixel_order(ctx, MB_RGB);                       /* 默认 MB_BGR（OpenCV/FFmpeg 顺序） */
+
+size_t color_stride = (size_t)mb_storage_width(ctx) * 3;
+size_t iter_stride  = (size_t)mb_width(ctx) * sizeof(int32_t);
+uint8_t* colors     = malloc((size_t)mb_height(ctx) * color_stride);
+int32_t* iterations = malloc((size_t)mb_height(ctx) * iter_stride);
+
+/* 颜色与迭代数可任选其一或同时输出（迭代数即逃逸代数，可用于分析/帧复用） */
+mb_status status = mb_render_outputs(ctx, colors, color_stride, iterations, iter_stride);
+mb_write_image(ctx, "frame.bmp", MB_IMAGE_BMP);        /* 另有 MB_IMAGE_PNM，无外部依赖 */
+mb_destroy(ctx);
+```
+
+也可以不建 context，用一次性参数 API：`mb_render_frame(params, colors, stride, iterations, stride)`
+与 `mb_render_image(params, path, format)`（`mb_render_params` 需填 `struct_size`）。
+一个 context 持有自己的工作线程池，**不要跨线程并发调用同一个 context**（`mb_cancel` 例外）。
+
 ## 测试
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
@@ -124,8 +151,12 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 ```
 
 ## 架构简介
-- `Mandelbrot.cpp` – 共享框架：生命周期、坐标预计算、颜色表、调度与裁剪。
-- `MandelbrotKernel_{scalar,avx2,neon}.cpp` – 每架构的内层迭代内核。
+- `Mandelbrot.cpp` – 共享框架（不依赖 OpenCV）：生命周期、坐标预计算、颜色表、调度、取消，
+  以及渲染到调用者缓冲/迭代数组（`generate_frame`）。
+- `include/mandelbrot/mandelbrot.h` + `MandelbrotC.cpp` – C ABI 共享库：context 与一次性参数
+  API、颜色（BGR/RGB）与 int32 迭代数组输出、BMP/PNM 写图、取消。
+- `MandelbrotOpenCV.h` – 可选的 OpenCV 适配（`generate_mat`/`generate_into_mat`）。
+- `MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` – 每架构的内层迭代内核。
 - `MandelbrotKernel.cpp` – 运行时 CPU 探测与内核选择（`__cpuid`/`_xgetbv` 或 `__builtin_cpu_supports`）。
 - `ThreadPool.cpp` / `CommandLine.cpp` – 线程池与命令行解析。
 

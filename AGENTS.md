@@ -47,8 +47,8 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 
 ## Layout
 - `src/main.cpp` - entry point (`run()` plus top-level exception handling), progress output, and the render->encode pipeline (a small frame-buffer pool feeding a writer thread).
-- `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cancellation, and `generate_into(buffer, stride)` for zero-copy rendering into caller-owned BGR8 buffers. It is OpenCV-free.
-- `include/mandelbrot/mandelbrot.h` + `src/MandelbrotC.cpp` - C ABI (`mb_*`) shared library target `mandelbrot` for FFI callers (Python ctypes, P/Invoke, ...). Handles are opaque, errors are status codes, exceptions never cross the boundary.
+- `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cancellation, and `generate_frame(FrameTargets)` for zero-copy rendering into caller-owned color (BGR/RGB) and int32 iteration buffers. It is OpenCV-free.
+- `include/mandelbrot/mandelbrot.h` + `src/MandelbrotC.cpp` - C ABI (`mb_*`) shared library target `mandelbrot` for FFI callers (Python ctypes, P/Invoke, ...): contexts plus a one-shot `mb_render_frame` parameter API, color (BGR/RGB) and int32 iteration outputs, dependency-free BMP/PNM image writing, cancellation. Handles are opaque, errors are status codes, exceptions never cross the boundary.
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.

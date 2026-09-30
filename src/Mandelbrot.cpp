@@ -51,12 +51,17 @@ Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations, int _threads
     i_data(static_cast<double*>(operator new(static_cast<size_t>(height) * sizeof(double), std::align_val_t(32)))),
     thread_pool(height, validate_thread_count(_threads)),
     image(static_cast<size_t>(height) * width * 3) {
-    output_data_ = image.data();
-    output_step_ = static_cast<size_t>(width) * 3;
+    color_output_ = image.data();
+    color_step_ = static_cast<size_t>(width) * 3;
     const KernelSelection selection = select_kernel();
     kernel_ = selection.function;
     kernel_name_ = selection.name;
     setView(zoom, offset_x, offset_y);
+    rebuild_color_map();
+}
+
+void Mandelbrot::rebuild_color_map() {
+    color_map.clear();
     color_map.reserve(static_cast<size_t>(max_iterations) + 1);
     const float iter_scale = 4.0F;
     const float min_kelvin = 100.0F;
@@ -69,9 +74,21 @@ Mandelbrot::Mandelbrot(int _width, int _height, int _maxIterations, int _threads
         const float b = 51 * iter_scale * kelvin * (kelvin - 2000) / 800 / max_kelvin;
         const float g = 51 * iter_scale * kelvin * (kelvin - 500) / 1100 / max_kelvin;
         const float r = 255 * iter_scale * kelvin / max_kelvin;
-        color_map.push_back({clamp(b), clamp(g), clamp(r)});
+        if (pixel_order_ == PixelOrder::Rgb) {
+            color_map.push_back({clamp(r), clamp(g), clamp(b)});
+        } else {
+            color_map.push_back({clamp(b), clamp(g), clamp(r)});
+        }
     }
     color_map.push_back({0, 0, 0});
+}
+
+void Mandelbrot::set_pixel_order(PixelOrder order) {
+    if (pixel_order_ == order) {
+        return;
+    }
+    pixel_order_ = order;
+    rebuild_color_map();
 }
 
 void Mandelbrot::setView(double new_zoom, double new_offset_x, double new_offset_y) {
@@ -91,27 +108,48 @@ void Mandelbrot::render_tile(int row_index, int x_begin, int x_end) {
     const RowContext context{
         r_data.get(),
         i_data.get()[row_index],
-        output_data_ + (static_cast<size_t>(row_index) * output_step_),
+        color_output_ != nullptr
+            ? color_output_ + (static_cast<size_t>(row_index) * color_step_)
+            : nullptr,
         x_begin,
         x_end,
         max_iterations,
-        color_map.data()
+        color_map.data(),
+        iteration_output_ != nullptr
+            ? reinterpret_cast<std::int32_t*>(
+                  iteration_output_ + (static_cast<size_t>(row_index) * iteration_step_))
+            : nullptr,
+        iteration_step_
     };
     kernel_(context);
 }
 
 auto Mandelbrot::generate() -> const uint8_t* {
-    generate_into(image.data(), static_cast<size_t>(width) * 3);
+    generate_frame({.bgr=image.data(), .bgr_stride=static_cast<size_t>(width) * 3});
     return image.data();
 }
 
 auto Mandelbrot::generate_into(uint8_t* buffer, std::size_t stride) -> void {
-    if (buffer == nullptr || stride < static_cast<size_t>(width) * 3) {
-        throw std::invalid_argument("frame buffer must provide " + std::to_string(height) +
-                                    " rows of at least " + std::to_string(width) + " BGR pixels");
+    generate_frame({.bgr=buffer, .bgr_stride=stride});
+}
+
+auto Mandelbrot::generate_frame(const FrameTargets& targets) -> void {
+    if (targets.bgr == nullptr && targets.iterations == nullptr) {
+        throw std::invalid_argument("at least one output buffer is required");
     }
-    output_data_ = buffer;
-    output_step_ = stride;
+    if (targets.bgr != nullptr && targets.bgr_stride < static_cast<size_t>(width) * 3) {
+        throw std::invalid_argument("color buffer must provide " + std::to_string(height) +
+                                    " rows of at least " + std::to_string(width) + " pixels");
+    }
+    if (targets.iterations != nullptr &&
+        targets.iterations_stride < static_cast<size_t>(width) * sizeof(std::int32_t)) {
+        throw std::invalid_argument("iteration buffer must provide " + std::to_string(height) +
+                                    " rows of at least " + std::to_string(width) + " int32 values");
+    }
+    color_output_ = targets.bgr;
+    color_step_ = targets.bgr_stride;
+    iteration_output_ = reinterpret_cast<uint8_t*>(targets.iterations);
+    iteration_step_ = targets.iterations_stride;
     if (schedule_ == Schedule::PerRow) {
         for (int row_index = 0; row_index < height && !is_cancelled(); ++row_index) {
             thread_pool.enqueue([this, row_index]() {
@@ -145,8 +183,10 @@ auto Mandelbrot::generate_into(uint8_t* buffer, std::size_t stride) -> void {
         }
         thread_pool.wait_all_idle();
     }
-    output_data_ = image.data();
-    output_step_ = static_cast<size_t>(width) * 3;
+    color_output_ = image.data();
+    color_step_ = static_cast<size_t>(width) * 3;
+    iteration_output_ = nullptr;
+    iteration_step_ = 0;
 }
 
 auto Mandelbrot::kernel_name() const -> const char* {

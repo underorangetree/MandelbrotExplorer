@@ -10,8 +10,8 @@ void render_row_scalar(const RowContext& context) {
     const double ci = context.ci;
     const double y2 = ci * ci;
     const double y2_over_4 = y2 * 0.25;
+    std::int32_t* const iterations = context.iterations;
     for (int col = context.x_begin; col < context.x_end; ++col) {
-        uint8_t* const pixel_ptr = context.row_ptr + (col * 3);
         const double cr = context.r_data[col];
         const double xq = cr - 0.25;
         const double q = std::fma(xq, xq, y2);
@@ -34,8 +34,14 @@ void render_row_scalar(const RowContext& context) {
                 ++iter;
             }
         }
-        pixel_ptr[0] = context.color_map[iter][0];
-        pixel_ptr[1] = context.color_map[iter][1];
-        pixel_ptr[2] = context.color_map[iter][2];
+        if (iterations != nullptr) {
+            iterations[col] = iter;
+        }
+        if (context.row_ptr != nullptr) {
+            uint8_t* const pixel_ptr = context.row_ptr + (col * 3);
+            pixel_ptr[0] = context.color_map[iter][0];
+            pixel_ptr[1] = context.color_map[iter][1];
+            pixel_ptr[2] = context.color_map[iter][2];
+        }
     }
 }
