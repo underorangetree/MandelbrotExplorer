@@ -94,7 +94,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libopencv-dev python3-numpy
-        python3 -m pip install --user --break-system-packages gcovr
+        # >= 8 for --merge-lines (see the coverage step).
+        python3 -m pip install --user --break-system-packages "gcovr>=8"
 
     - name: Configure CMake (coverage)
       run: >
@@ -114,9 +115,11 @@ jobs:
 
     # The AVX-512 kernel file is excluded: CI runners may lack AVX-512, and
     # the kernel-equality tests skip kernels the CPU does not support.
+    # --merge-lines stops gcovr >= 8 from counting every template instantiation
+    # of the same source line (guard<...> in MandelbrotC.cpp) separately.
     - name: Coverage (line >= 90%)
       run: >
         python3 -m gcovr -r . --filter src/
         --exclude src/MandelbrotKernel_avx512.cpp
         --gcov-ignore-parse-errors negative_hits.warn_once_per_file
-        --fail-under-line 90 --txt-summary
+        --merge-lines --fail-under-line 90 --txt-summary
