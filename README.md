@@ -68,6 +68,18 @@ cmake --build build --config Release
 Linux 上可先 `sudo apt install libopencv-dev`；Windows 上手动使用 vcpkg 时加上
 `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`。
 
+## 安装
+
+```bash
+cmake --install build/windows-msvc-vs2026 --config Release          # 或 --prefix <dir>
+cmake --install build/linux-gcc                                     # Linux/macOS 预设同理
+```
+
+安装内容：`bin/`（CLI 应用与两个共享库）、`include/mandelbrot_explorer/`（头文件）、
+`lib/cmake/MandelbrotExplorer/`（`find_package` 包配置，见 [docs/c-api.md](docs/c-api.md)）。
+Windows 上用 vcpkg 预设构建时，OpenCV 运行库（含其第三方依赖）会一并安装到 `bin/`，可直接
+分发；Linux/macOS 需要系统安装 OpenCV。
+
 ## 运行
 
 ```bash

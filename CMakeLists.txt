@@ -119,6 +119,13 @@ if(MANDELBROT_EXPLORER_WITH_VIDEO)
 
     add_executable(${PROJECT_NAME} src/main.cpp)
     target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+    install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    # On Windows the OpenCV runtime and its own dependencies must sit next to
+    # the executable. With the vcpkg toolchain, enabling
+    # X_VCPKG_APPLOCAL_DEPS_INSTALL (the Windows presets do) copies the same
+    # app-local set the build tree gets during `cmake --install`; other setups
+    # can use $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}> or put OpenCV's bin
+    # directory on PATH.
 endif()
 
 # CMake package: consumers install this project and use

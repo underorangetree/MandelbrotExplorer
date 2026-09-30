@@ -17,8 +17,9 @@ MandelbrotExplorer 提供两个 C ABI 共享库，任何支持 FFI 的语言都�
   （macOS 为 `.dylib`，带 `SOVERSION` 符号链接）；
 - Windows：`build/<config>/mandelbrot_explorer.dll` 与导入库 `.lib`（`<config>` 如 `Release`）。
 
-头文件在 `include/mandelbrot_explorer/`。也可以 `cmake --install . --prefix <dir>` 安装
-（目前只安装两个库和头文件，不包含 CLI 应用）。
+头文件在 `include/mandelbrot_explorer/`。也可以 `cmake --install <build> --prefix <dir> --config Release`
+安装：`bin/`（两个共享库与 CLI 应用）、`include/`、`lib/cmake/MandelbrotExplorer/`（CMake 包）。
+Windows 上使用 vcpkg 预设时，OpenCV 运行库及其第三方依赖会一并安装到 `bin/`。
 
 Windows 上核心库没有额外运行期依赖；`mandelbrot_explorer_video` 需要 OpenCV 的 DLL 位于
 `PATH` 或 exe 同目录。

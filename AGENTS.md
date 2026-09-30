@@ -76,6 +76,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - Timing uses `steady_clock`; `elapsed`/`total_elapsed` can be 0, so guard divisions.
 - Signals: `sigint_flag` is `volatile std::sig_atomic_t`; the handler must not perform I/O.
 - Python packaging: the version in `bindings/python/mandelbrot_explorer/__init__.py` (`__version__`) must match `PROJECT_VERSION`; `selftest.py` verifies it against the loaded library, and wheel jobs stage the native library with `bindings/python/stage_libraries.py`.
+- Windows installs: the `base-vcpkg` preset sets `X_VCPKG_APPLOCAL_DEPS_INSTALL=ON`, so `cmake --install` copies the OpenCV runtime and its third-party DLLs next to the executable.
 
 ## CI
 - `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest), plus ASan/UBSan and coverage (gcovr, line gate) jobs.
