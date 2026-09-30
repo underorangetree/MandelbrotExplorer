@@ -233,9 +233,9 @@ endif()
 # package) into a ZIP on Windows and a TGZ elsewhere; on Windows the bundle
 # also carries the OpenCV runtime because of X_VCPKG_APPLOCAL_DEPS_INSTALL.
 set(CPACK_PACKAGE_NAME "MandelbrotExplorer")
-set(CPACK_PACKAGE_VENDOR "UnderOrangeTree")
+set(CPACK_PACKAGE_VENDOR "underorangetree")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Mandelbrot set zoom video generator with runtime-dispatched SIMD rendering")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/UnderOrangeTree/MandelbrotExplorer")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/underorangetree/MandelbrotExplorer")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 if(WIN32)

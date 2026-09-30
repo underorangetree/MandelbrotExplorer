@@ -3,7 +3,7 @@
 高性能的 Mandelbrot 集合视频制作器，使用 C++20 编写，结合 SIMD、多线程与 OpenCV 库，实现视频生成。
 
 ![Static Badge](https://img.shields.io/badge/C++-20-%2300599C?logo=cplusplus)
-![GitHub repo size](https://img.shields.io/github/repo-size/UnderOrangeTree/MandelbrotExplorer)
+![GitHub repo size](https://img.shields.io/github/repo-size/underorangetree/MandelbrotExplorer)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ~~首先，这个仓库是个史山，请不要在这个上花费太多的时间~~

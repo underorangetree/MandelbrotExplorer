@@ -66,6 +66,6 @@
   黑体辐射颜色映射，MP4 导出与平滑缩放动画。
 - 参数校验与 `--help`；macOS（Homebrew）构建支持。
 
-[Unreleased]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.6.0...HEAD
-[0.6.0]: https://github.com/UnderOrangeTree/MandelbrotExplorer/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/UnderOrangeTree/MandelbrotExplorer/releases/tag/v0.5.0
+[Unreleased]: https://github.com/underorangetree/MandelbrotExplorer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/underorangetree/MandelbrotExplorer/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/underorangetree/MandelbrotExplorer/releases/tag/v0.5.0

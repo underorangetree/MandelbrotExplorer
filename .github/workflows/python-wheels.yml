@@ -130,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     # Trusted Publishing: configure the matching publisher at
     # https://pypi.org/manage/account/publishing/ (project mandelbrot-explorer,
-    # owner UnderOrangeTree, workflow python-wheels.yml, environment pypi).
+    # owner underorangetree, workflow python-wheels.yml, environment pypi).
     # No API token is stored in the repository.
     environment:
       name: pypi

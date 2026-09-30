@@ -21,9 +21,9 @@ classifiers = [
 dependencies = ["numpy>=1.20"]
 
 [project.urls]
-Homepage = "https://github.com/UnderOrangeTree/MandelbrotExplorer"
-Documentation = "https://github.com/UnderOrangeTree/MandelbrotExplorer/blob/main/docs/c-api.md"
-Source = "https://github.com/UnderOrangeTree/MandelbrotExplorer"
+Homepage = "https://github.com/underorangetree/MandelbrotExplorer"
+Documentation = "https://github.com/underorangetree/MandelbrotExplorer/blob/main/docs/c-api.md"
+Source = "https://github.com/underorangetree/MandelbrotExplorer"
 
 [tool.setuptools]
 packages = ["mandelbrot_explorer"]
