@@ -116,13 +116,16 @@ jobs:
         merge-multiple: true
         path: dist
 
-    # Idempotent: re-running a tag build updates the existing release.
+    # Idempotent: re-running a tag build updates the existing release. --repo is
+    # required because this job does not check the repository out, so gh has no
+    # git remote to infer the repository from.
     - name: Create the release with the wheels
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
-        gh release upload "$GITHUB_REF_NAME" dist/*.whl --clobber
+        gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes
+        gh release upload "$GITHUB_REF_NAME" dist/*.whl --repo "$GITHUB_REPOSITORY" --clobber
 
   publish:
     needs: [wheel, wheel-linux]
