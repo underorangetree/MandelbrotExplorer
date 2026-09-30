@@ -50,6 +50,8 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `src/Mandelbrot.{h,cpp}` - shared framework: allocation, validation, coordinate precomputation, color map, scheduling, cancellation, and `generate_frame(FrameTargets)` for zero-copy rendering into caller-owned color (BGR/RGB) and int32 iteration buffers. It is OpenCV-free.
 - `include/mandelbrot/mandelbrot.h` + `src/MandelbrotC.cpp` - C ABI (`mb_*`) shared library target `mandelbrot` for FFI callers (Python ctypes, P/Invoke, ...): contexts plus a one-shot `mb_render_frame` parameter API, color (BGR/RGB) and int32 iteration outputs, dependency-free BMP/PNM image writing, cancellation. Handles are opaque, errors are status codes, exceptions never cross the boundary.
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
+- `include/mandelbrot/video.h` + `src/MandelbrotVideoC.cpp` - OpenCV-based video export shared library `mandelbrot_video` (`mb_write_video` with the app's animation); the core `mandelbrot` library stays dependency-free.
+- `src/ViewSequence.h` / `src/VideoCodec.h` - shared zoom animation curve and codec name -> fourcc mapping used by the app, the benchmark and the video API.
 - `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found).
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.

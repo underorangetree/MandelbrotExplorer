@@ -135,6 +135,19 @@ mb_destroy(ctx);
 与 `mb_render_image(params, path, format)`（`mb_render_params` 需填 `struct_size`）。
 一个 context 持有自己的工作线程池，**不要跨线程并发调用同一个 context**（`mb_cancel` 例外）。
 
+视频导出在独立的 OpenCV 版共享库 `mandelbrot_video` 中（核心 `mandelbrot` 保持无依赖）：
+
+```c
+#include "mandelbrot/video.h"
+
+mb_video_params vp = {0};
+vp.struct_size = sizeof(vp);
+vp.width = 1920; vp.height = 1080; vp.max_iterations = 2000; vp.threads = 0;
+vp.fps = 60; vp.duration_seconds = 10; vp.codec = "h264"; vp.quality = -1;
+mb_status status = mb_write_video(&vp, "zoom.mp4");   /* 无可用编码器时返回 MB_VIDEO_ERROR */
+```
+动画曲线与 CLI 完全一致（共用 `src/ViewSequence.h`），编码器名称集合也一致（`src/VideoCodec.h`）。
+
 Python 封装见 [`bindings/python`](bindings/python/README.md)（ctypes + numpy 零拷贝，无需编译）：
 
 ```python

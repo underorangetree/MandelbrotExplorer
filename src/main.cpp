@@ -19,16 +19,12 @@
 #include "ExitStatus.h"
 #include "CommandLine.h"
 #include "Mandelbrot.h"
+#include "VideoCodec.h"
+#include "ViewSequence.h"
 
 using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 volatile std::sig_atomic_t sigint_flag = 0;
-
-static auto smooth(double a, double b, double t, double t0) -> double {
-    double x = t / t0;
-    double smooth = x * x * (3 - (2 * x));
-    return a + ((b - a) * smooth);
-}
 
 constexpr int default_terminal_width = 100;
 #ifdef _WIN32
@@ -82,25 +78,6 @@ static void sigint_handler(int) {
     sigint_flag = 1;
 }
 
-static auto codec_fourcc(const std::string& name) -> int {
-    if (name == "h264" || name == "avc1") {
-        return cv::VideoWriter::fourcc('a', 'v', 'c', '1');
-    }
-    if (name == "h265" || name == "hevc") {
-        return cv::VideoWriter::fourcc('h', 'e', 'v', '1');
-    }
-    if (name == "vp9") {
-        return cv::VideoWriter::fourcc('v', 'p', '0', '9');
-    }
-    if (name == "av1") {
-        return cv::VideoWriter::fourcc('a', 'v', '0', '1');
-    }
-    if (name == "mjpg") {
-        return cv::VideoWriter::fourcc('M', 'J', 'P', 'G');
-    }
-    return cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-}
-
 static auto run(const RenderConfig& config, double progress_update_interval) -> int {
     std::signal(SIGINT, sigint_handler);
     Mandelbrot mandelbrot(config.width, config.height, config.max_iterations, config.threads);
@@ -108,7 +85,7 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
         std::cerr << "Requested kernel '" << config.kernel << "' is not available on this CPU/build.\n";
         return static_cast<int>(ExitStatus::InvalidArgument);
     }
-    const int fourcc = codec_fourcc(config.codec);
+    const int fourcc = mandelbrot::video_codec_fourcc(config.codec);
     cv::VideoWriter writer(config.output_file, fourcc, config.fps, cv::Size(config.width, config.height));
     if (!writer.isOpened()) {
         std::cerr << "Could not open the output video file for write (codec: " << config.codec << ").\n";
@@ -201,8 +178,8 @@ static auto run(const RenderConfig& config, double progress_update_interval) -> 
                 index = free_indices.front();
                 free_indices.pop_front();
             }
-            zoom = 0.8 * std::pow(1.05, smooth(0.0, 280, frame, total_frames));
-            mandelbrot.setView(zoom, -0.743643887037158704752191506114774, 0.131825904205311970493132056385139);
+            zoom = mandelbrot::animation_zoom(frame, total_frames);
+            mandelbrot.setView(zoom, mandelbrot::animation_center_x, mandelbrot::animation_center_y);
             TimePoint start = std::chrono::steady_clock::now();
             mandelbrot.generate_into(frame_buffers[static_cast<std::size_t>(index)].storage.data,
                                      frame_buffers[static_cast<std::size_t>(index)].storage.step);

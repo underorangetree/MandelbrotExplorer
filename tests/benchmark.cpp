@@ -8,6 +8,7 @@
 #include <opencv2/core.hpp>
 #include "Mandelbrot.h"
 #include "MandelbrotOpenCV.h"
+#include "ViewSequence.h"
 
 namespace {
 
@@ -48,25 +49,18 @@ auto measure(Mandelbrot::Schedule schedule, int width, int height, int max_itera
     return {.seconds_per_frame=seconds / frames, .checksum=checksum};
 }
 
-auto smoothstep(double low, double high, double t, double t0) -> double {
-    const double x = t / t0;
-    const double weight = x * x * (3.0 - (2.0 * x));
-    return low + ((high - low) * weight);
-}
-
-// Renders the same zoom animation the application produces, so the benchmark
-// reflects the real workload distribution rather than a single fixed view.
+// Renders the same zoom animation the application produces (the shared
+// ViewSequence.h curve), so the benchmark reflects the real workload
+// distribution rather than a single fixed view.
 auto measure_animation_once(Mandelbrot::Schedule schedule, int width, int height,
                             int max_iterations, int frames) -> double {
-    constexpr double center_x = -0.743643887037158704752191506114774;
-    constexpr double center_y = 0.131825904205311970493132056385139;
     Mandelbrot mandelbrot(width, height, max_iterations);
     mandelbrot.set_schedule(schedule);
     apply_kernel_from_env(mandelbrot);
     const auto start = std::chrono::steady_clock::now();
     for (int frame = 0; frame < frames; ++frame) {
-        const double zoom = 0.8 * std::pow(1.05, smoothstep(0.0, 280.0, frame, frames));
-        mandelbrot.setView(zoom, center_x, center_y);
+        const double zoom = mandelbrot::animation_zoom(frame, frames);
+        mandelbrot.setView(zoom, mandelbrot::animation_center_x, mandelbrot::animation_center_y);
         static_cast<void>(generate_mat(mandelbrot));
     }
     const auto end = std::chrono::steady_clock::now();

@@ -83,10 +83,28 @@ install(TARGETS mandelbrot
 install(FILES include/mandelbrot/mandelbrot.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot)
 
+# Video export lives in a separate OpenCV-based library so the core C ABI stays
+# dependency-free.
+add_library(mandelbrot_video SHARED
+    src/MandelbrotVideoC.cpp
+    include/mandelbrot/video.h)
+target_link_libraries(mandelbrot_video PRIVATE mandelbrot_core ${OpenCV_LIBS})
+target_include_directories(mandelbrot_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(mandelbrot_video PRIVATE MANDELBROT_VIDEO_BUILD)
+set_target_properties(mandelbrot_video PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR})
+install(TARGETS mandelbrot_video
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES include/mandelbrot/video.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot)
+
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_core ${OpenCV_LIBS})
 
-foreach(target mandelbrot_core mandelbrot ${PROJECT_NAME})
+foreach(target mandelbrot_core mandelbrot mandelbrot_video ${PROJECT_NAME})
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -121,6 +139,13 @@ if(BUILD_TESTING)
     target_link_libraries(c_api_smoke PRIVATE mandelbrot)
     set_target_properties(c_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME c_api COMMAND c_api_smoke)
+
+    add_executable(video_api_smoke tests/video_api_smoke.c)
+    target_link_libraries(video_api_smoke PRIVATE mandelbrot mandelbrot_video)
+    set_target_properties(video_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+    add_test(NAME video_api COMMAND video_api_smoke)
+    # Exit code 3 = no usable video backend: skipped.
+    set_tests_properties(video_api PROPERTIES SKIP_RETURN_CODE 3)
 
     # Python binding self-test (skipped with exit code 3 when numpy is absent).
     find_package(Python3 COMPONENTS Interpreter QUIET)

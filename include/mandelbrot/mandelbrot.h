@@ -31,7 +31,8 @@ typedef enum mb_status {
     MB_OK = 0,
     MB_INVALID_ARGUMENT = 1,
     MB_INTERNAL_ERROR = 2,
-    MB_CANCELLED = 3
+    MB_CANCELLED = 3,
+    MB_VIDEO_ERROR = 4 /* the video writer could not be opened (video API) */
 } mb_status;
 
 /* Channel order of the rendered color frames. BGR matches OpenCV/FFmpeg,
