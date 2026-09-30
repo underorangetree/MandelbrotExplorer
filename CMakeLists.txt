@@ -13,7 +13,13 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(OpenCV REQUIRED COMPONENTS core videoio)
+# With -DMANDELBROT_EXPLORER_WITH_VIDEO=OFF only the dependency-free core
+# library and the C ABI are built (used by the Python wheel job).
+option(MANDELBROT_EXPLORER_WITH_VIDEO "Build the OpenCV-based video API and the CLI application" ON)
+
+if(MANDELBROT_EXPLORER_WITH_VIDEO)
+    find_package(OpenCV REQUIRED COMPONENTS core videoio)
+endif()
 find_package(Threads REQUIRED)
 
 add_library(mandelbrot_explorer_core STATIC
@@ -85,28 +91,35 @@ install(TARGETS mandelbrot_explorer
 install(FILES include/mandelbrot_explorer/mandelbrot_explorer.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot_explorer)
 
-# Video export lives in a separate OpenCV-based library so the core C ABI stays
-# dependency-free.
-add_library(mandelbrot_explorer_video SHARED
-    src/MandelbrotVideoC.cpp
-    include/mandelbrot_explorer/video.h)
-target_link_libraries(mandelbrot_explorer_video PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
-target_include_directories(mandelbrot_explorer_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_definitions(mandelbrot_explorer_video PRIVATE MANDELBROT_EXPLORER_VIDEO_BUILD)
-set_target_properties(mandelbrot_explorer_video PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR})
-install(TARGETS mandelbrot_explorer_video
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES include/mandelbrot_explorer/video.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot_explorer)
+if(MANDELBROT_EXPLORER_WITH_VIDEO)
+    # Video export lives in a separate OpenCV-based library so the core C ABI stays
+    # dependency-free.
+    add_library(mandelbrot_explorer_video SHARED
+        src/MandelbrotVideoC.cpp
+        include/mandelbrot_explorer/video.h)
+    target_link_libraries(mandelbrot_explorer_video PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+    target_include_directories(mandelbrot_explorer_video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_compile_definitions(mandelbrot_explorer_video PRIVATE MANDELBROT_EXPLORER_VIDEO_BUILD)
+    set_target_properties(mandelbrot_explorer_video PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR})
+    install(TARGETS mandelbrot_explorer_video
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(FILES include/mandelbrot_explorer/video.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mandelbrot_explorer)
 
-add_executable(${PROJECT_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+    add_executable(${PROJECT_NAME} src/main.cpp)
+    target_link_libraries(${PROJECT_NAME} PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+endif()
 
-foreach(target mandelbrot_explorer_core mandelbrot_explorer mandelbrot_explorer_video ${PROJECT_NAME})
+set(_mandelbrot_targets mandelbrot_explorer_core mandelbrot_explorer)
+if(MANDELBROT_EXPLORER_WITH_VIDEO)
+    list(APPEND _mandelbrot_targets mandelbrot_explorer_video ${PROJECT_NAME})
+endif()
+
+foreach(target IN LISTS _mandelbrot_targets)
     if(MSVC)
         target_compile_options(${target} PRIVATE
             /W4
@@ -130,26 +143,13 @@ endforeach()
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(mandelbrot_tests tests/mandelbrot_tests.cpp)
-    target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
-    add_test(NAME unit COMMAND mandelbrot_tests)
-
-    add_executable(mandelbrot_benchmark tests/benchmark.cpp)
-    target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
-
     add_executable(c_api_smoke tests/c_api_smoke.c)
     target_link_libraries(c_api_smoke PRIVATE mandelbrot_explorer)
     set_target_properties(c_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
     add_test(NAME c_api COMMAND c_api_smoke)
 
-    add_executable(video_api_smoke tests/video_api_smoke.c)
-    target_link_libraries(video_api_smoke PRIVATE mandelbrot_explorer_video)
-    set_target_properties(video_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
-    add_test(NAME video_api COMMAND video_api_smoke)
-    # Exit code 3 = no usable video backend: skipped.
-    set_tests_properties(video_api PROPERTIES SKIP_RETURN_CODE 3)
-
-    # Python binding self-test (skipped with exit code 3 when numpy is absent).
+    # Python binding self-test (skipped with exit code 3 when numpy is absent or
+    # the optional video library was not built).
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME python_binding
@@ -158,23 +158,39 @@ if(BUILD_TESTING)
         set_tests_properties(python_binding PROPERTIES SKIP_RETURN_CODE 3)
     endif()
 
-    add_test(NAME cli_help COMMAND ${PROJECT_NAME} --help)
-    add_test(NAME cli_version COMMAND ${PROJECT_NAME} --version)
+    if(MANDELBROT_EXPLORER_WITH_VIDEO)
+        add_executable(mandelbrot_tests tests/mandelbrot_tests.cpp)
+        target_link_libraries(mandelbrot_tests PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
+        add_test(NAME unit COMMAND mandelbrot_tests)
 
-    add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
-    set_tests_properties(cli_invalid_size PROPERTIES WILL_FAIL TRUE)
+        add_executable(mandelbrot_benchmark tests/benchmark.cpp)
+        target_link_libraries(mandelbrot_benchmark PRIVATE mandelbrot_explorer_core ${OpenCV_LIBS})
 
-    # On x86 the NEON kernel is not compiled in: run() must reject it before
-    # opening the video writer (on aarch64, NEON is the native kernel).
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i.86")
-        add_test(NAME cli_kernel_unavailable COMMAND ${PROJECT_NAME} --kernel neon)
-        set_tests_properties(cli_kernel_unavailable PROPERTIES WILL_FAIL TRUE)
+        add_executable(video_api_smoke tests/video_api_smoke.c)
+        target_link_libraries(video_api_smoke PRIVATE mandelbrot_explorer_video)
+        set_target_properties(video_api_smoke PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+        add_test(NAME video_api COMMAND video_api_smoke)
+        # Exit code 3 = no usable video backend: skipped.
+        set_tests_properties(video_api PROPERTIES SKIP_RETURN_CODE 3)
+
+        add_test(NAME cli_help COMMAND ${PROJECT_NAME} --help)
+        add_test(NAME cli_version COMMAND ${PROJECT_NAME} --version)
+
+        add_test(NAME cli_invalid_size COMMAND ${PROJECT_NAME} -s 0x0)
+        set_tests_properties(cli_invalid_size PROPERTIES WILL_FAIL TRUE)
+
+        # On x86 the NEON kernel is not compiled in: run() must reject it before
+        # opening the video writer (on aarch64, NEON is the native kernel).
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i.86")
+            add_test(NAME cli_kernel_unavailable COMMAND ${PROJECT_NAME} --kernel neon)
+            set_tests_properties(cli_kernel_unavailable PROPERTIES WILL_FAIL TRUE)
+        endif()
+
+        add_test(NAME cli_small_render COMMAND ${PROJECT_NAME} -s 320x240 --maxiter 16 --fps 1 --duration 1 -o ctest_out.mp4)
+        # ExitStatus::VideoWriterError == 3: treated as "skipped" so the test does not
+        # fail on OpenCV builds without a usable video writer backend.
+        set_tests_properties(cli_small_render PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            SKIP_RETURN_CODE 3)
     endif()
-
-    add_test(NAME cli_small_render COMMAND ${PROJECT_NAME} -s 320x240 --maxiter 16 --fps 1 --duration 1 -o ctest_out.mp4)
-    # ExitStatus::VideoWriterError == 3: treated as "skipped" so the test does not
-    # fail on OpenCV builds without a usable video writer backend.
-    set_tests_properties(cli_small_render PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        SKIP_RETURN_CODE 3)
 endif()

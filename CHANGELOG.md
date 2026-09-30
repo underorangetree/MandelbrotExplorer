@@ -15,6 +15,10 @@
   （`src/VideoCodec.h`）。
 - Python 绑定（`bindings/python`）：ctypes + numpy 零拷贝，支持颜色/迭代输出、写图与视频导出，
   无需编译。
+- Python 打包：`bindings/python/pyproject.toml`、库 staging 脚本与 Linux/Windows/macOS 三平台
+  wheel 构建工作流；wheel 捆绑无 OpenCV 依赖的核心库。
+- CMake 选项 `MANDELBROT_EXPLORER_WITH_VIDEO`（默认 ON）：设为 OFF 时只构建无 OpenCV 依赖的
+  核心库与 C ABI（Python wheel 即用此方式构建）。
 - CLI 新选项：`--threads`、`--kernel`（新增 AVX-512 内核可选）、`--codec`、`--quality`、
   `-v/--version`。
 - AVX-512 内核；NEON 内核与 AVX2 的结构和语义对齐。

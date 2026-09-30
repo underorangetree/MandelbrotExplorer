@@ -1,0 +1,61 @@
+name: Python wheels
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ "v*" ]
+
+# Least privilege: the workflow only reads the repository (actions/checkout).
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: windows-2022
+          - runner: macos-14
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    # The core library has no OpenCV dependency, so the wheel job can skip it.
+    - name: Configure (core only)
+      run: cmake -S . -B build-wheel -DMANDELBROT_EXPLORER_WITH_VIDEO=OFF -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build the core shared library
+      run: cmake --build build-wheel --config Release --target mandelbrot_explorer
+
+    - name: Stage the native library into the package
+      run: python bindings/python/stage_libraries.py --build-dir build-wheel
+
+    - name: Build the wheel
+      run: |
+        python -m pip install --upgrade build
+        python -m build --wheel bindings/python --outdir dist
+
+    # setuptools tags a pure-Python wheel as py3-none-any, but the package
+    # bundles a native library, so retag it with the host platform.
+    - name: Retag the wheel for this platform
+      run: |
+        python -m pip install --upgrade wheel
+        python bindings/python/retag_wheel.py dist
+
+    - name: Install and smoke-test the wheel
+      run: |
+        python -m pip install --find-links dist mandelbrot-explorer
+        python -c "import mandelbrot_explorer as me; colors = me.render_frame(160, 90, max_iterations=32); assert colors.shape == (90, 160, 3), colors.shape; print('wheel OK', me.__version__)"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: wheel-${{ matrix.runner }}
+        path: dist/*.whl

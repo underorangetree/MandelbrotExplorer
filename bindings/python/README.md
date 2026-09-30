@@ -3,6 +3,33 @@
 对 C ABI 共享库（`mandelbrot_explorer.dll` / `libmandelbrot_explorer.so` / `libmandelbrot_explorer.dylib`）的轻量
 封装：ctypes + numpy，**无需编译步骤**，颜色与迭代数组都是零拷贝（库直接写入 numpy 缓冲）。
 
+## 安装
+
+### 使用 wheel
+
+CI（`.github/workflows/python-wheels.yml`）为 Linux / Windows / macOS 构建 wheel，wheel 内已捆绑对应平台的
+核心库：
+
+```bash
+pip install mandelbrot_explorer-*-py3-none-*.whl
+```
+
+wheel 不包含 OpenCV 版的视频库；`write_video` 需要另行构建 `mandelbrot_explorer_video` 并用环境变量
+`MANDELBROT_EXPLORER_VIDEO_LIBRARY` 指向它（见第 4、5 节）。
+
+### 从源码安装
+
+先按仓库 README 构建共享库，再把库拷进包目录并安装：
+
+```bash
+cmake --build build --config Release
+python bindings/python/stage_libraries.py --build-dir build   # 需要视频库时加 --video
+pip install bindings/python
+```
+
+也可以完全不安装：在仓库内直接运行（把 `bindings/python` 加入 `sys.path` 或从该目录运行），
+绑定会自动在 `build/` 下查找库（见下节）。
+
 ## 使用
 
 先构建共享库（`mandelbrot_explorer` 目标），然后：

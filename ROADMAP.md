@@ -13,8 +13,9 @@
 ## 0.6.0 - 发布准备
 
 - [ ] 推送 `main` 上待发布的提交并确认 CI 通过
-- [ ] `CMakeLists.txt` 中 `project(... VERSION 0.6.0)`（单一来源：`mb_version()`、Python `version()`、
-      CLI `--version` 自动跟随）
+- [ ] 版本号升到 0.6.0：`CMakeLists.txt` 的 `project(... VERSION ...)` 与
+      `bindings/python/mandelbrot_explorer/__init__.py` 的 `__version__`（selftest 会校验二者一致，
+      `mb_version()`、Python `version()`、CLI `--version` 跟随 CMake 版本）
 - [ ] 发布说明（GitHub Release 描述或 `CHANGELOG.md`）：新库、改名（库名/头路径/环境变量）、
       性能改造，并注明 0.x 期间 C ABI 仍可能变动
 - [x] README 修正：`共享库 mandelbrot` -> `mandelbrot_explorer`；动画曲线位置改为 `src/ViewSequence.h`
@@ -37,7 +38,9 @@
 
 - [ ] CMake 包配置：`install(EXPORT)` + `MandelbrotExplorerConfig.cmake`，支持 `find_package`
 - [ ] 应用本体的 install 规则；Windows 运行期 OpenCV DLL 的处理说明
-- [ ] Python：`pyproject.toml` + 各平台 wheel（捆绑 `.dll/.so/.dylib`）
+- [x] Python 打包：`pyproject.toml` + staging 脚本 + Linux/Windows/macOS wheel 工作流
+      （wheel 仅捆绑无依赖的核心库）
+- [ ] 发布到 PyPI（manylinux/musllinux wheel，使用 cibuildwheel 或 auditwheel 修复）
 - [ ] （可选）CPack 压缩包、vcpkg 端口
 
 ### CI 与质量

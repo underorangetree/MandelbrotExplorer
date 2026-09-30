@@ -37,6 +37,8 @@ def main() -> int:
         me.load_library(args.library)
 
     print("library version:", me.version())
+    check(me.__version__ == me.version(),
+          f"package version {me.__version__} does not match the library version {me.version()}")
 
     with me.Mandelbrot(64, 32, max_iterations=64, threads=2, kernel="scalar") as ctx:
         ctx.set_view(1.0, -0.5, 0.0)

@@ -35,6 +35,10 @@ try:  # numpy is optional; only the array helpers need it
 except ImportError:  # pragma: no cover - exercised on minimal installs
     _np = None
 
+# Kept in sync with the CMake project version; the self-test verifies that it
+# matches the version reported by the loaded shared library.
+__version__ = "0.5.0"
+
 __all__ = [
     "Mandelbrot",
     "MandelbrotError",

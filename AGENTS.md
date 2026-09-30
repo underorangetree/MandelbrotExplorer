@@ -43,6 +43,8 @@ RelWithDebInfo builds (optimized + symbols, e.g. for profiling) have their own p
 the matching `*-relwithdebinfo` configure preset first for Ninja/Linux/macOS
 (`cmake --preset linux-gcc-relwithdebinfo && cmake --build --preset linux-gcc-relwithdebinfo`).
 
+`-DMANDELBROT_EXPLORER_WITH_VIDEO=OFF` builds only the dependency-free core library and C ABI (used by the Python wheel workflow, and usable where OpenCV is unavailable).
+
 Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_render` is skipped (exit code 3) when no usable video backend is available; that is expected.
 
 ## Layout
@@ -52,7 +54,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
 - `include/mandelbrot_explorer/video.h` + `src/MandelbrotVideoC.cpp` - OpenCV-based video export shared library `mandelbrot_explorer_video` (`mb_write_video` with the app's animation); the core `mandelbrot` library stays dependency-free.
 - `src/ViewSequence.h` / `src/VideoCodec.h` - shared zoom animation curve and codec name -> fourcc mapping used by the app, the benchmark and the video API.
-- `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found).
+- `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found); `pyproject.toml`, `stage_libraries.py` and `retag_wheel.py` bundle the native library into platform-tagged wheels.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.
 - `src/ThreadPool.{h,cpp}` - thread pool.
@@ -72,6 +74,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - Exit codes: `ExitStatus` is used both as the process exit code and as the CLI tests' `SKIP_RETURN_CODE` (3 when no video backend is available).
 - Timing uses `steady_clock`; `elapsed`/`total_elapsed` can be 0, so guard divisions.
 - Signals: `sigint_flag` is `volatile std::sig_atomic_t`; the handler must not perform I/O.
+- Python packaging: the version in `bindings/python/mandelbrot_explorer/__init__.py` (`__version__`) must match `PROJECT_VERSION`; `selftest.py` verifies it against the loaded library, and wheel jobs stage the native library with `bindings/python/stage_libraries.py`.
 
 ## CI
 - `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest).

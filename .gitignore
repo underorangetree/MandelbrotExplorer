@@ -71,6 +71,9 @@ Testing/
 # Python
 __pycache__/
 *.py[cod]
+*.whl
+*.egg-info/
+dist/
 
 # CMake Local Presets
 CMakeUserPresets.json
