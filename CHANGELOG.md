@@ -16,7 +16,9 @@
 - Python 绑定（`bindings/python`）：ctypes + numpy 零拷贝，支持颜色/迭代输出、写图与视频导出，
   无需编译。
 - Python 打包：`bindings/python/pyproject.toml`、库 staging 脚本与 Linux/Windows/macOS 三平台
-  wheel 构建工作流；wheel 捆绑无 OpenCV 依赖的核心库。
+  wheel 构建工作流（Linux wheel 在 manylinux_2_28 容器内构建）；wheel 捆绑无 OpenCV 依赖的核心库，
+  推送 `v*` tag 时自动创建 Release 并发布到 PyPI（Trusted Publishing），发布前校验 tag 与包/项目
+  版本一致。
 - CMake 选项 `MANDELBROT_EXPLORER_WITH_VIDEO`（默认 ON）：设为 OFF 时只构建无 OpenCV 依赖的
   核心库与 C ABI（Python wheel 即用此方式构建）。
 - CLI 新选项：`--threads`、`--kernel`（新增 AVX-512 内核可选）、`--codec`、`--quality`、

@@ -54,7 +54,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `src/MandelbrotOpenCV.h` - optional OpenCV adapters (`generate_mat`, `generate_into_mat`) used by the app, tests and benchmark.
 - `include/mandelbrot_explorer/video.h` + `src/MandelbrotVideoC.cpp` - OpenCV-based video export shared library `mandelbrot_explorer_video` (`mb_write_video` with the app's animation); the core `mandelbrot` library stays dependency-free.
 - `src/ViewSequence.h` / `src/VideoCodec.h` - shared zoom animation curve and codec name -> fourcc mapping used by the app, the benchmark and the video API.
-- `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found); `pyproject.toml`, `stage_libraries.py` and `retag_wheel.py` bundle the native library into platform-tagged wheels.
+- `bindings/python/` - ctypes + numpy binding for the C ABI (`selftest.py` is registered as the `python_binding` ctest when a Python interpreter is found); `pyproject.toml`, `stage_libraries.py` and `retag_wheel.py` bundle the native library into platform-tagged wheels; `manylinux_build.sh` builds the Linux wheel inside the manylinux image and `check_version.py` guards releases against version mismatches.
 - `src/MandelbrotKernel.{h,cpp}` - `RowContext`, kernel declarations, runtime `select_kernel()`.
 - `src/MandelbrotKernel_{scalar,avx2,avx512,neon}.cpp` - per-architecture inner-loop kernels.
 - `src/ThreadPool.{h,cpp}` - thread pool.
@@ -80,7 +80,7 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest), plus ASan/UBSan and coverage (gcovr, line gate) jobs.
 - `.github/workflows/cmake-windows.yml` - Windows MSVC (OpenCV installed via choco).
 - `.github/workflows/cmake-macos.yml` - macOS arm64 (Homebrew OpenCV, `macos-brew` preset).
-- `.github/workflows/python-wheels.yml` - Linux/Windows/macOS wheels on tags or manually; attaches them to the GitHub release for `v*` tags.
+- `.github/workflows/python-wheels.yml` - Linux (manylinux container)/Windows/macOS wheels on tags or manually; attaches them to the GitHub release and publishes to PyPI (Trusted Publishing) for `v*` tags.
 
 ## Docs
 - `README.md` is user-facing; keep it in sync when CLI behavior changes.

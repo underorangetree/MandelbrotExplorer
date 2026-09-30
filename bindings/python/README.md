@@ -8,9 +8,12 @@
 ### 使用 wheel
 
 CI（`.github/workflows/python-wheels.yml`）为 Linux / Windows / macOS 构建 wheel，wheel 内已捆绑对应平台的
-核心库：
+核心库；Linux wheel 在 manylinux_2_28 容器内构建，兼容较旧的 glibc。推送 `v*` tag 时会自动创建 Release
+并发布到 PyPI（Trusted Publishing）：
 
 ```bash
+pip install mandelbrot-explorer                 # PyPI 首发后可用
+# 或从 Release 下载对应平台的 wheel：
 pip install mandelbrot_explorer-*-py3-none-*.whl
 ```
 
