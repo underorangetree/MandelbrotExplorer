@@ -236,7 +236,8 @@ mandelbrot_benchmark anim ...    # 按应用同样的缩放曲线对比总耗时
 
 - 缓动曲线形状（三次贝塞尔）与每帧倍率的推算规则目前不可调，只能设置中心与两端的缩放值。
 - 视频导出依赖 OpenCV 的编码后端；`--quality` 是否生效由具体编码器决定。
-- Python wheel：Linux 需要 glibc >= 2.28（manylinux_2_28），macOS wheel 为 arm64；其余平台从源码构建。
+- Python wheel：Linux 需要 glibc >= 2.28（manylinux_2_28），macOS wheel 为 arm64 且 macOS 版本
+  要求与构建 runner 一致（当前为 14+）；其余平台从源码构建。
 - 尚未实现 2x 帧复用等进一步优化（见 ROADMAP）。
 
 ## 架构简介
