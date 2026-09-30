@@ -59,3 +59,25 @@ jobs:
       with:
         name: wheel-${{ matrix.runner }}
         path: dist/*.whl
+
+  release:
+    needs: wheel
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: wheel-*
+        merge-multiple: true
+        path: dist
+
+    # Idempotent: re-running a tag build updates the existing release.
+    - name: Create the release with the wheels
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
+        gh release upload "$GITHUB_REF_NAME" dist/*.whl --clobber

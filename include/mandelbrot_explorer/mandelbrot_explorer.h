@@ -36,13 +36,23 @@ typedef enum mb_status {
 } mb_status;
 
 /* Channel order of the rendered color frames. BGR matches OpenCV/FFmpeg,
- * RGB matches numpy/PIL conventions. */
+ * RGB matches numpy/PIL conventions. In C++ the enums get a fixed underlying
+ * type: a C caller may pass any integer, and reading an out-of-range value
+ * must not be undefined behavior (the implementation rejects it). */
+#ifdef __cplusplus
+typedef enum mb_pixel_order : int {
+#else
 typedef enum mb_pixel_order {
+#endif
     MB_BGR = 0,
     MB_RGB = 1
 } mb_pixel_order;
 
+#ifdef __cplusplus
+typedef enum mb_image_format : int {
+#else
 typedef enum mb_image_format {
+#endif
     MB_IMAGE_BMP = 0,
     MB_IMAGE_PNM = 1
 } mb_image_format;

@@ -27,10 +27,11 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Install OpenCV and Clang
+    # numpy lets the python_binding ctest run instead of being skipped.
+    - name: Install OpenCV, Clang and numpy
       run: |
         sudo apt-get update
-        sudo apt-get install -y libopencv-dev clang
+        sudo apt-get install -y libopencv-dev clang python3-numpy
 
     - name: Configure CMake
       run: >
@@ -45,3 +46,77 @@ jobs:
 
     - name: Test
       run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install OpenCV and numpy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopencv-dev python3-numpy
+
+    - name: Configure CMake (ASan + UBSan)
+      run: >
+        cmake -S . -B build-sanitize
+        -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_TESTING=ON
+        -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+        -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+        -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+
+    - name: Build
+      run: cmake --build build-sanitize
+
+    - name: Test
+      env:
+        # Leak checks report third-party allocations (OpenCV/FFmpeg); the
+        # sanitizers still catch memory errors in our own code.
+        ASAN_OPTIONS: detect_leaks=0
+        UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+      # LD_PRELOAD lets the python_binding test load the instrumented shared
+      # library into the (uninstrumented) Python interpreter; libstdc++ must be
+      # preloaded as well so ASan can intercept __cxa_throw.
+      run: |
+        export LD_PRELOAD="$(gcc -print-file-name=libasan.so) /usr/lib/x86_64-linux-gnu/libstdc++.so.6"
+        ctest --test-dir build-sanitize --output-on-failure
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install OpenCV, numpy and gcovr
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopencv-dev python3-numpy
+        python3 -m pip install --user --break-system-packages gcovr
+
+    - name: Configure CMake (coverage)
+      run: >
+        cmake -S . -B build-cov
+        -DCMAKE_BUILD_TYPE=Debug
+        -DBUILD_TESTING=ON
+        -DCMAKE_C_FLAGS="--coverage -O0"
+        -DCMAKE_CXX_FLAGS="--coverage -O0"
+        -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        -DCMAKE_SHARED_LINKER_FLAGS="--coverage"
+
+    - name: Build
+      run: cmake --build build-cov
+
+    - name: Test
+      run: ctest --test-dir build-cov --output-on-failure
+
+    # The AVX-512 kernel file is excluded: CI runners may lack AVX-512, and
+    # the kernel-equality tests skip kernels the CPU does not support.
+    - name: Coverage (line >= 90%)
+      run: >
+        python3 -m gcovr -r . --filter src/
+        --exclude src/MandelbrotKernel_avx512.cpp
+        --gcov-ignore-parse-errors negative_hits.warn_once_per_file
+        --fail-under-line 90 --txt-summary

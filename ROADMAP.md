@@ -45,11 +45,11 @@
 
 ### CI 与质量
 
-- [ ] macOS CI job
-- [ ] CI 安装 numpy，让 `python_binding` 真正执行而不是被 skip
-- [ ] ASan/UBSan 构建 job
-- [ ] tag 触发的发布自动化
-- [ ] 覆盖率门槛（行 >= 90%）
+- [x] macOS CI job（arm64；Intel 尚未覆盖）
+- [x] CI 安装 numpy，让 `python_binding` 真正执行而不是被 skip
+- [x] ASan/UBSan 构建 job
+- [x] tag 触发的发布自动化（`v*` 自动创建 Release 并附带三平台 wheel）
+- [x] 覆盖率门槛（行 >= 90%，排除 CPU 相关的 AVX-512 内核文件）
 
 ### 文档
 

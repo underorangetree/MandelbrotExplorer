@@ -77,8 +77,10 @@ Before handing off, make sure the build succeeds and `ctest` passes. `cli_small_
 - Python packaging: the version in `bindings/python/mandelbrot_explorer/__init__.py` (`__version__`) must match `PROJECT_VERSION`; `selftest.py` verifies it against the loaded library, and wheel jobs stage the native library with `bindings/python/stage_libraries.py`.
 
 ## CI
-- `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest).
+- `.github/workflows/cmake-linux.yml` - Linux x64 and ARM64 x gcc/clang (build + ctest), plus ASan/UBSan and coverage (gcovr, line gate) jobs.
 - `.github/workflows/cmake-windows.yml` - Windows MSVC (OpenCV installed via choco).
+- `.github/workflows/cmake-macos.yml` - macOS arm64 (Homebrew OpenCV, `macos-brew` preset).
+- `.github/workflows/python-wheels.yml` - Linux/Windows/macOS wheels on tags or manually; attaches them to the GitHub release for `v*` tags.
 
 ## Docs
 - `README.md` is user-facing; keep it in sync when CLI behavior changes.

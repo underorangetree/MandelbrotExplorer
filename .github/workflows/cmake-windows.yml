@@ -19,6 +19,14 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    # numpy lets the python_binding ctest run instead of being skipped.
+    - name: Install numpy for the Python binding test
+      run: python -m pip install numpy
+
     # Chocolatey's prebuilt OpenCV is much faster to set up than building it
     # from source via vcpkg. It installs to C:\tools\opencv.
     - name: Install OpenCV

@@ -1,0 +1,37 @@
+name: CMake on macOS
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Least privilege: the workflow only reads the repository (actions/checkout).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install OpenCV and Ninja
+      run: brew install opencv ninja
+
+    - name: Install numpy for the Python binding test
+      run: python -m pip install numpy
+
+    - name: Configure CMake
+      run: cmake --preset macos-brew
+
+    - name: Build
+      run: cmake --build --preset macos-brew-release
+
+    - name: Test
+      run: ctest --test-dir build/macos-brew --output-on-failure

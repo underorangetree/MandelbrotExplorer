@@ -34,10 +34,14 @@
 - AVX-512 内核重写为双链结构。
 - 头文件包含整理（补齐直接依赖、排序、架构守卫）。
 - CI 权限最小化（`permissions: contents: read`）。
+- CI：Linux/Windows/macOS 任务安装 numpy（`python_binding` 不再被跳过），新增 macOS、ASan/UBSan 与
+  覆盖率门槛（行 >= 90%）任务；推送 `v*` tag 时自动创建 Release 并附带三平台 wheel。
 
 ### 修复
 
 - 修复 AVX-512 内核在边界像素上与标量参考不一致的舍入问题。
+- 修复 C 调用者传入非法枚举值时库内读取的未定义行为（C++ 侧枚举改为固定底层类型，
+  sanitizer CI 发现）。
 - 修复小尺寸视频渲染测试被误跳过的问题，并加强内核一致性测试（同时比较迭代数组）。
 - 补齐错误路径与边界测试：行覆盖率 84% -> 92%（gcovr，Linux x64）。
 
